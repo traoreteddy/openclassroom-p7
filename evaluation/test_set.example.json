@@ -1,0 +1,12 @@
+[
+  {
+    "question": "Quels concerts de jazz ont lieu ce week-end à Paris ?",
+    "expected_answer": "Liste des concerts de jazz du week-end présents dans l'index.",
+    "annotation": "La réponse doit citer uniquement des événements de l'index, avec date et lieu."
+  },
+  {
+    "question": "Y a-t-il des expositions gratuites pour les enfants ?",
+    "expected_answer": "Expositions gratuites adaptées au jeune public, ou mention qu'aucune n'est disponible.",
+    "annotation": "Vérifier que le système ne propose pas d'événements payants."
+  }
+]

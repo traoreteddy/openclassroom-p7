@@ -1,0 +1,30 @@
+# Environnements et secrets
+.env
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+
+# Données et index (volumineux, régénérables)
+data/raw/*
+data/processed/*
+data/index/*
+!data/**/.gitkeep
+
+# Notebooks
+.ipynb_checkpoints/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Fichiers temporaires Office
+docs/~$*
