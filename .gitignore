@@ -18,6 +18,10 @@ data/processed/*
 data/index/*
 !data/**/.gitkeep
 
+# Résultats d'évaluation (régénérables)
+evaluation/results/*
+!evaluation/results/.gitkeep
+
 # Notebooks
 .ipynb_checkpoints/
 
