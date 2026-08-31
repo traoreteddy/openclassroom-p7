@@ -1,0 +1,25 @@
+# Environnements et caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Secrets (injectés via --env-file / variables d'environnement)
+.env
+
+# Données locales (montées en volume)
+data/
+
+# Hors périmètre de l'image
+.git/
+.github/
+.idea/
+.vscode/
+.DS_Store
+notebooks/
+docs/
+evaluation/
+tests/
