@@ -24,8 +24,27 @@ class Settings(BaseSettings):
     openagenda_api_key: str = ""
     mistral_api_key: str = ""
 
-    # Périmètre des données (à ajuster selon le POC)
-    openagenda_location: str = "Paris"
+    # Source de données : jeu "Public events - OpenAgenda" exposé par l'API
+    # Opendatasoft Explore v2.1 (données OpenAgenda, sans clé d'API requise).
+    ods_base_url: str = "https://public.opendatasoft.com/api/explore/v2.1"
+    ods_dataset_id: str = "evenements-publics-openagenda"
+    ods_page_size: int = 100          # plafond imposé par l'API
+    ods_max_offset: int = 10_000      # l'API refuse offset + limit > 10 000
+    ods_timeout: float = 30.0
+    ods_max_retries: int = 3
+
+    # Périmètre de collecte
+    cities: list[str] = ["Paris"]     # ex. CITIES='["Paris","Lyon"]' dans .env
+    history_days: int = 365           # profondeur d'historique, en jours
+    period_days: int = 90             # fenêtre à venir, en jours
+    event_types: list[str] = []       # ex. ["concert","exposition"] ; vide = tous types
+    window_days: int = 30             # découpage temporel des requêtes (plafond d'offset)
+    max_events: int = 2000            # garde-fou sur le volume collecté
+
+    # Nettoyage
+    min_description_length: int = 30  # sous ce seuil, l'événement est écarté
+    max_years_ahead: int = 5          # au-delà, la date est considérée aberrante
+    excluded_agendas: list[str] = ["Mes événements France Travail"]
 
     # Vectorisation
     # Fournisseur d'embeddings : "mistral" (par défaut, via API) ou
@@ -35,6 +54,15 @@ class Settings(BaseSettings):
     hf_embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     chunk_size: int = 512
     chunk_overlap: int = 64
+
+    # Base vectorielle
+    # "flat" : recherche exhaustive, résultats exacts — optimal jusqu'à ~100 000
+    # vecteurs. "hnsw" : graphe navigable, sous-linéaire, résultats approchés —
+    # pertinent au-delà. Voir scripts/benchmark_search.py pour l'arbitrage mesuré.
+    faiss_index_type: Literal["flat", "hnsw"] = "flat"
+    hnsw_m: int = 32                  # voisins par nœud : qualité vs mémoire
+    hnsw_ef_construction: int = 200   # effort de construction du graphe
+    hnsw_ef_search: int = 64          # effort de parcours : rappel vs latence
 
     # Récupération
     top_k: int = 5
