@@ -18,7 +18,7 @@ Question ───────────────────────�
 ```
 
 ### 2.1 Ingestion et indexation
-- Source et périmètre des données collectées
+- Source et périmètre des données collectées → voir [api-source.md](api-source.md)
 - Règles de nettoyage et de déduplication
 - Stratégie de chunking (taille, chevauchement, champs vectorisés)
 - Modèle d'embeddings et format de l'index persisté
