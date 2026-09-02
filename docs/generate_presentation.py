@@ -309,15 +309,15 @@ def tableau(slide, y, entetes, lignes, largeurs, taille=13):
             cx += largeur
 
 
-def note(slide, y, label, texte):
+def note(slide, y, label, texte, hauteur=1.15):
     """Encadré d'insistance, pour le fait qui doit rester en tête."""
-    h = Inches(1.15)
+    h = Inches(hauteur)
     rectangle(slide, MARGE, y, L - 2 * MARGE, h, BLANC, REGLE)
     rectangle(slide, MARGE, y, Inches(0.045), h, ACCENT)
     bloc(slide, MARGE + Inches(0.28), y + Inches(0.12), L - 2 * MARGE - Inches(0.5),
          Inches(0.3), label.upper(), taille=10.5, gras=True, couleur=ACCENT)
     bloc(slide, MARGE + Inches(0.28), y + Inches(0.44), L - 2 * MARGE - Inches(0.5),
-         Inches(0.6), texte, taille=14.5, couleur=ENCRE_DOUCE)
+         h - Inches(0.5), texte, taille=14.5, couleur=ENCRE_DOUCE)
 
 
 def construire() -> Presentation:
@@ -481,24 +481,25 @@ def construire() -> Presentation:
 
     # ---------- 8. API et Docker ----------
     s = page(prs, "Exposé en HTTP, livré en conteneur", "Mise à disposition")
-    tableau(s, Inches(2.1),
+    tableau(s, Inches(2.05),
             ["Route", "Rôle", "Protection"],
             [["POST /ask", "question → réponse générée et sources citées", "validation Pydantic"],
+             ["GET /metadata", "périmètre du catalogue : villes, période, sources", "pagination limit/offset"],
              ["POST /rebuild", "reconstruction complète de l'index", "en-tête X-API-Key"],
              ["GET /health", "état du service et de l'index", "—"],
              ["GET /docs", "documentation Swagger interactive", "—"]],
             [Inches(2.6), Inches(6.3), Inches(2.7)])
-    bloc(s, MARGE, Inches(4.15), Inches(11.6), Inches(0.35),
+    bloc(s, MARGE, Inches(4.35), Inches(11.6), Inches(0.35),
          "docker compose up", taille=17, gras=True, couleur=DATA, police="Consolas")
-    chiffres(s, Inches(4.6), [
+    chiffres(s, Inches(4.78), [
         ("1,58 Go", "taille de l'image"),
         ("1 min 40", "durée du build"),
         ("51,4 s", "reconstruction complète de l'index"),
         ("2,4 s", "temps de réponse moyen"),
     ])
-    bloc(s, MARGE, Inches(6.2), Inches(11.6), Inches(0.6),
-         "Premier build : plusieurs gigaoctets, toute la pile CUDA de NVIDIA embarquée par une "
-         "dépendance d'embeddings locale. Isolée en extra optionnel — l'image n'appelle que Mistral.",
+    bloc(s, MARGE, Inches(6.38), Inches(11.6), Inches(0.55),
+         "/metadata répond à un besoin métier : savoir ce que le catalogue couvre avant de se "
+         "fier à une réponse. 896 événements, dont 668 à venir, issus de 59 agendas.",
          taille=12.5, couleur=GRIS)
 
     # ---------- 9. Démonstration ----------
@@ -579,7 +580,30 @@ def construire() -> Presentation:
          "16 scénarios adverses, tous conformes — chacun rejoué à chaque exécution du banc.",
          taille=13, couleur=GRIS)
 
-    # ---------- 13. Limites ----------
+    # ---------- 13. Coût de production ----------
+    s = page(prs, "Ce que coûterait la production", "Économie")
+    bloc(s, MARGE, Inches(2.05), Inches(11.6), Inches(0.35),
+         "Volumes mesurés, non supposés : 1 804 jetons d'entrée et 196 de sortie par question",
+         taille=15, gras=True, couleur=ENCRE)
+    tableau(s, Inches(2.5),
+            ["Questions par jour", "Génération / mois", "Total mensuel"],
+            [["100", "1,17 $", "2,07 $"],
+             ["1 000", "11,68 $", "12,58 $"],
+             ["10 000", "116,82 $", "117,72 $"],
+             ["100 000", "1 168,20 $", "1 169,10 $"]],
+            [Inches(3.6), Inches(3.9), Inches(3.6)])
+    note(s, Inches(4.58), "Le point de bascule",
+         "Étendre à la France entière — 1,2 million d'événements — représente 414 millions "
+         "de jetons : 41 $ par reconstruction, 1 243 $ par mois si elle est quotidienne. "
+         "L'indexation incrémentale devient une condition de viabilité.", hauteur=1.42)
+    bloc(s, MARGE, Inches(6.18), Inches(11.6), Inches(0.85),
+         "Pourquoi Mistral, alors ? Pas pour le prix : la génération est au tarif identique chez "
+         "OpenAI et son embedding est cinq fois moins cher.\n"
+         "Souveraineté des données, qualité en français, adéquation d'un petit modèle à une "
+         "reformulation contrainte — et réversibilité, le fournisseur tenant en deux fonctions.",
+         taille=13, couleur=ENCRE_DOUCE, interligne=1.35)
+
+    # ---------- 14. Limites ----------
     s = page(prs, "Ce que ce POC ne fait pas", "Limites")
     puces(s, Inches(2.15), [
         ("Paris uniquement.", "Le catalogue national compte 1,2 million d'événements ; la collecte est déjà paramétrée pour une liste de villes."),
@@ -590,7 +614,7 @@ def construire() -> Presentation:
         ("« Ce week-end » n'est pas résolu en dates.", "Le modèle s'appuie sur les périodes textuelles du contexte."),
     ], taille=15.5)
 
-    # ---------- 14. Perspectives ----------
+    # ---------- 15. Perspectives ----------
     s = page(prs, "Ce qu'il faudrait pour la production", "Perspectives")
     colonnes = [
         ("Court terme", [
@@ -622,7 +646,7 @@ def construire() -> Presentation:
             bloc(s, x + Inches(0.28), Inches(2.95 + j * 0.72), largeur - Inches(0.55),
                  Inches(0.7), "— " + item, taille=13, couleur=ENCRE_DOUCE, interligne=1.2)
 
-    # ---------- 15. Reproductibilité ----------
+    # ---------- 16. Reproductibilité ----------
     s = page(prs, "Reproductible en trois commandes", "Livraison")
     rectangle(s, MARGE, Inches(2.15), L - 2 * MARGE, Inches(1.9), ENCRE)
     bloc(s, MARGE + Inches(0.4), Inches(2.4), Inches(11), Inches(1.5),
