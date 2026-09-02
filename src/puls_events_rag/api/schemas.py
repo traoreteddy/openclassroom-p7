@@ -51,6 +51,14 @@ class AskResponse(BaseModel):
     answer: str = Field(description="Réponse rédigée par le modèle à partir des sources")
     sources: list[Source] = Field(default_factory=list)
     events_found: int = Field(description="Nombre d'événements distincts retenus")
+    warnings: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Anomalies relevées par la validation de sortie : URL absente des "
+            "sources et retirée, événement cité sans fiche correspondante. "
+            "Une liste non vide signale une possible injection dans les données."
+        ),
+    )
 
 
 class RebuildResponse(BaseModel):

@@ -16,6 +16,7 @@ Deux traitements séparent cette chaîne d'un enchaînement naïf :
 from __future__ import annotations
 
 import logging
+import re
 from functools import lru_cache
 
 from langchain_core.documents import Document
@@ -125,6 +126,7 @@ def format_event(document: Document, numero: int = 1) -> str:
 
     return EVENT_TEMPLATE.format(
         numero=numero,
+        url=meta.get("url", "(source inconnue)"),
         titre=meta.get("titre", "(sans titre)"),
         periode=meta.get("periode", "date non précisée"),
         lieu=meta.get("lieu") or "lieu non précisé",
@@ -149,6 +151,61 @@ def format_context(documents: list[Document]) -> str:
     if not documents:
         return "(aucun événement ne correspond à cette recherche)"
     return "\n\n".join(format_context_blocks(documents))
+
+
+# Une URL dans la réponse doit provenir d'une fiche source. Toute autre est
+# suspecte : c'est le vecteur privilégié d'une injection indirecte (hameçonnage).
+_URL_RE = re.compile(r"(?:https?://|www\.)[^\s\)\]<>\"']+", re.IGNORECASE)
+_TITRE_RE = re.compile(r"\*\*(.+?)\*\*")
+
+
+def _domaine(url: str) -> str:
+    url = re.sub(r"^https?://", "", url.lower()).removeprefix("www.")
+    return url.split("/")[0]
+
+
+def valider_reponse(reponse: str, documents: list[Document]) -> tuple[str, list[str]]:
+    """Vérifie que la réponse s'appuie bien sur les documents récupérés.
+
+    Aucune consigne de prompt ni délimiteur ne protège à 100 % d'une injection
+    dissimulée dans un document tiers : cette validation est le dernier rempart,
+    et le seul qui ne repose pas sur la bonne volonté du modèle.
+
+    Deux contrôles :
+
+    - **URL étrangères** : toute adresse absente des fiches sources est retirée
+      de la réponse. C'est le vecteur d'une injection indirecte visant à faire
+      afficher un lien d'hameçonnage à l'utilisateur.
+    - **Événements non étayés** : un titre mis en avant qui ne correspond à
+      aucune fiche récupérée est signalé — le modèle a inventé, ou a repris un
+      intitulé glissé dans une description.
+
+    Returns:
+        La réponse nettoyée, et la liste des anomalies constatées.
+    """
+    anomalies: list[str] = []
+    domaines_sources = {_domaine(d.metadata.get("url", "")) for d in documents}
+    domaines_sources.discard("")
+
+    for url in set(_URL_RE.findall(reponse)):
+        if _domaine(url) not in domaines_sources:
+            anomalies.append(f"URL absente des sources, retirée de la réponse : {url}")
+            reponse = reponse.replace(url, "[lien retiré]")
+
+    titres_sources = [(d.metadata.get("titre") or "").lower() for d in documents]
+    for titre in _TITRE_RE.findall(reponse):
+        nettoye = titre.split("—")[0].strip().lower()
+        # Le prompt autorise des intertitres en gras (« Pour du jazz : »). Ils se
+        # terminent par un deux-points, jamais un titre d'événement.
+        if nettoye.endswith(":") or len(nettoye) < 8:
+            continue
+        if not any(nettoye[:24] in source or source[:24] in nettoye
+                   for source in titres_sources if source):
+            anomalies.append(f"Événement cité sans fiche correspondante : {titre[:60]}")
+
+    if anomalies:
+        logger.warning("Validation de la réponse : %s", anomalies)
+    return reponse, anomalies
 
 
 def to_sources(documents: list[Document]) -> list[dict]:
@@ -197,14 +254,17 @@ def answer_question(question: str, k: int | None = None) -> dict:
                       "ou un type d'événement différent.",
             "sources": [],
             "events_found": 0,
+            "warnings": [],
         }
 
     reponse = build_chain().invoke({
         "context": format_context(documents),
         "question": question,
     })
+    reponse, anomalies = valider_reponse(reponse.strip(), documents)
     return {
-        "answer": reponse.strip(),
+        "answer": reponse,
         "sources": to_sources(documents),
         "events_found": len(documents),
+        "warnings": anomalies,
     }
