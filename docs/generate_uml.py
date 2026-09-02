@@ -331,17 +331,30 @@ def ligne_de_vie(ax, x, y_haut, y_bas, nom, sous_titre="", couleur=SURFACE,
             linestyle=(0, (3, 3)), zorder=1)
 
 
+DEMI_ACTIVATION = 0.055  # demi-largeur de la barre d'activation
+
+
 def activation(ax, x, y_bas, y_haut, couleur=ACCENT):
-    ax.add_patch(Rectangle((x - 0.055, y_bas), 0.11, y_haut - y_bas,
-                           facecolor=PAPIER, edgecolor=couleur, linewidth=1.0, zorder=2))
+    ax.add_patch(Rectangle((x - DEMI_ACTIVATION, y_bas), DEMI_ACTIVATION * 2,
+                           y_haut - y_bas, facecolor=PAPIER, edgecolor=couleur,
+                           linewidth=1.0, zorder=2))
 
 
 def message(ax, x1, x2, y, texte, retour=False, couleur=ENCRE_DOUCE, decalage=0.11):
+    """Message entre deux lignes de vie.
+
+    Les extrémités sont posées sur le bord des barres d'activation, et non au
+    centre de la ligne de vie : sinon le trait traverse visiblement la barre,
+    comme si le message naissait à l'intérieur de l'objet.
+    """
+    sens = 1 if x2 > x1 else -1
+    depart = x1 + sens * DEMI_ACTIVATION
+    arrivee = x2 - sens * DEMI_ACTIVATION
     style = "-|>" if not retour else "->"
-    ax.annotate("", xy=(x2, y), xytext=(x1, y),
+    ax.annotate("", xy=(arrivee, y), xytext=(depart, y),
                 arrowprops={"arrowstyle": style, "color": couleur, "linewidth": 1.0,
                             "linestyle": (0, (4, 2.5)) if retour else "solid",
-                            "shrinkA": 3, "shrinkB": 3, "mutation_scale": 11})
+                            "shrinkA": 0, "shrinkB": 0, "mutation_scale": 11})
     ax.text((x1 + x2) / 2, y + decalage, texte, fontsize=6.6,
             color=couleur if not retour else GRIS, family=SANS, ha="center",
             va="bottom", style="italic" if retour else "normal",
@@ -350,13 +363,14 @@ def message(ax, x1, x2, y, texte, retour=False, couleur=ENCRE_DOUCE, decalage=0.
 
 def auto_message(ax, x, y, texte, couleur=ENCRE_DOUCE, hauteur=0.30, largeur=0.42):
     """Message réflexif : le crochet UML, et son libellé dégagé de la ligne de vie."""
-    x0 = x + 0.055
-    ax.plot([x0, x0 + largeur, x0 + largeur, x0 + 0.08],
+    x0 = x + DEMI_ACTIVATION
+    ax.plot([x0, x0 + largeur, x0 + largeur, x0 + 0.10],
             [y, y, y - hauteur, y - hauteur],
             color=couleur, linewidth=1.0, solid_capstyle="butt", zorder=4)
-    ax.annotate("", xy=(x0, y - hauteur), xytext=(x0 + 0.09, y - hauteur),
+    # La pointe s'arrête exactement sur le bord de la barre.
+    ax.annotate("", xy=(x0, y - hauteur), xytext=(x0 + 0.10, y - hauteur),
                 arrowprops={"arrowstyle": "-|>", "color": couleur, "linewidth": 1.0,
-                            "mutation_scale": 10})
+                            "shrinkA": 0, "shrinkB": 0, "mutation_scale": 10})
     for i, ligne in enumerate(texte.split("\n")):
         ax.text(x0 + largeur + 0.12, y - 0.05 - i * 0.16, ligne, fontsize=6.4,
                 color=GRIS, family=SANS, va="center", zorder=5)
