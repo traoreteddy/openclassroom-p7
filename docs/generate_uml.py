@@ -321,7 +321,7 @@ def auto_message(ax, x, y, texte, couleur=ENCRE_DOUCE, hauteur=0.30, largeur=0.4
                 color=GRIS, family=SANS, va="center", zorder=5)
 
 
-def fragment(ax, x, y, w, h, operateur, condition="", texte=""):
+def fragment(ax, x, y, w, h, operateur, condition="", texte="", decalage_texte=0.12):
     """Fragment combiné UML : cadre, onglet d'opérateur, garde."""
     ax.add_patch(Rectangle((x, y), w, h, facecolor="none", edgecolor=DATA,
                            linewidth=0.9, zorder=1))
@@ -334,11 +334,11 @@ def fragment(ax, x, y, w, h, operateur, condition="", texte=""):
                 family=SANS, va="center", zorder=3,
                 bbox={"facecolor": PAPIER, "edgecolor": "none", "pad": 1.0})
     if texte:
-        # Calé à gauche dans le cadre : centré, la ligne de vie le traverserait.
+        # Décalé à droite de la ligne de vie : à gauche, le fond blanc du libellé
+        # perforait la barre d'activation, qui paraissait alors discontinue.
         for i, ligne in enumerate(texte.split("\n")):
-            ax.text(x + 0.12, y + h - 0.44 - i * 0.17, ligne, fontsize=6.3, color=DATA,
-                    family=SANS, va="center", zorder=3,
-                    bbox={"facecolor": PAPIER, "edgecolor": "none", "pad": 1.0})
+            ax.text(x + decalage_texte, y + h - 0.44 - i * 0.17, ligne, fontsize=6.3,
+                    color=DATA, family=SANS, va="center", zorder=3)
 
 
 def diagramme_sequence() -> plt.Figure:
@@ -360,39 +360,44 @@ def diagramme_sequence() -> plt.Figure:
         (6.95, "faiss_store", "index en cache", SURFACE, REGLE, False),
         (9.55, "Mistral AI", "API distante", DATA_PALE, DATA, True),
     ]
-    y_haut, y_bas = 5.72, 0.55
+    y_haut, y_bas = 5.72, 0.48
     for x, nom, sous, couleur, bordure, acteur in colonnes:
         ligne_de_vie(ax, x, y_haut, y_bas, nom, sous, couleur, bordure, acteur)
 
     xu, xa, xc, xf, xm = (c[0] for c in colonnes)
 
-    activation(ax, xa, 0.80, 5.55)
-    activation(ax, xc, 0.85, 4.90)
-    activation(ax, xf, 3.20, 4.65)
-    activation(ax, xm, 4.20, 4.42, DATA)
-    activation(ax, xm, 1.85, 2.30, DATA)
+    activation(ax, xa, 0.58, 5.55)
+    activation(ax, xc, 0.80, 4.82)
+    activation(ax, xf, 3.22, 4.60)
+    activation(ax, xm, 4.18, 4.40, DATA)
+    activation(ax, xm, 1.90, 2.34, DATA)
 
     message(ax, xu, xa, 5.48, "POST /ask  {question, top_k}")
-    auto_message(ax, xa, 5.30, "valider le schéma\n422 si le format est invalide")
+    auto_message(ax, xa, 5.32, "valider le schéma\n422 si le format est invalide",
+                 hauteur=0.28)
 
-    message(ax, xa, xc, 4.80, "answer_question(question, k)")
-    message(ax, xc, xf, 4.55, "similarity_search(k × 4)")
-    message(ax, xf, xm, 4.30, "embed_query(question)", couleur=DATA)
+    message(ax, xa, xc, 4.72, "answer_question(question, k)")
+    message(ax, xc, xf, 4.50, "similarity_search(k × 4)")
+    message(ax, xf, xm, 4.28, "embed_query(question)", couleur=DATA)
     message(ax, xm, xf, 4.00, "vecteur 1 024 dimensions  ·  80 ms", retour=True)
-    auto_message(ax, xf, 3.78, "recherche L2 exhaustive  ·  0,17 ms")
-    message(ax, xf, xc, 3.28, "20 chunks + métadonnées", retour=True)
+    auto_message(ax, xf, 3.80, "recherche L2 exhaustive  ·  0,17 ms", hauteur=0.28)
+    message(ax, xf, xc, 3.30, "20 chunks + métadonnées", retour=True)
 
-    fragment(ax, 4.28, 2.48, 1.95, 0.70, "loop", "sur les 20 chunks",
-             "déduplication par uid\n5 événements distincts retenus")
+    # Les fragments sont centrés sur la ligne de vie de rag.chain, seul
+    # participant : un cadre décalé laisserait croire qu'il en couvre d'autres.
+    fragment(ax, 4.30, 2.52, 2.30, 0.68, "loop", "sur les 20 chunks",
+             "déduplication par uid\n5 événements distincts retenus", decalage_texte=0.82)
 
-    message(ax, xc, xm, 2.20, "chat(prompt augmenté)", couleur=DATA)
-    message(ax, xm, xc, 1.90, "réponse rédigée  ·  ~2 s", retour=True)
+    message(ax, xc, xm, 2.24, "chat(prompt augmenté)", couleur=DATA)
+    message(ax, xm, xc, 1.94, "réponse rédigée  ·  ~2 s", retour=True)
 
-    fragment(ax, 4.28, 1.05, 1.95, 0.70, "alt", "URL hors sources",
-             "retirée de la réponse\net signalée dans warnings")
+    # « opt » et non « alt » : le fragment n'a qu'un opérande, exécuté ou non
+    # selon la garde. Un « alt » exigerait une alternative séparée par un trait.
+    fragment(ax, 4.30, 1.10, 2.30, 0.68, "opt", "URL hors sources",
+             "retirée de la réponse\net signalée dans warnings", decalage_texte=0.82)
 
-    message(ax, xc, xa, 0.85, "{answer, sources, warnings}", retour=True)
-    message(ax, xa, xu, 0.66, "200 OK  ·  JSON", retour=True)
+    message(ax, xc, xa, 0.80, "{answer, sources, warnings}", retour=True)
+    message(ax, xa, xu, 0.62, "200 OK  ·  JSON", retour=True)
 
     ax.text(0.15, 0.22, "Total ≈ 2,4 s — dominé par les deux appels à l'API Mistral. "
                         "La recherche vectorielle en représente 0,007 %.",
