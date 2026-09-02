@@ -39,6 +39,23 @@ L, H = Inches(13.333), Inches(7.5)  # 16:9
 MARGE = Inches(0.85)
 
 
+def compter_commits() -> int:
+    """Nombre de commits, lu depuis git.
+
+    Le chiffre était écrit en dur et s'est retrouvé faux dès le commit suivant :
+    il est désormais relu à chaque génération.
+    """
+    import subprocess
+
+    try:
+        sortie = subprocess.run(["git", "rev-list", "--count", "HEAD"],
+                                capture_output=True, text=True, check=True,
+                                cwd=Path(__file__).resolve().parent)
+        return int(sortie.stdout.strip())
+    except (subprocess.CalledProcessError, ValueError, FileNotFoundError):
+        return 0
+
+
 def bloc(slide, x, y, w, h, texte, taille=18, gras=False, couleur=ENCRE,
          police=CORPS_POLICE, align=PP_ALIGN.LEFT, interligne=1.15):
     """Pose un bloc de texte et retourne son cadre."""
@@ -374,12 +391,19 @@ def construire() -> Presentation:
     s = page(prs, "Le déroulé d'une question, seconde par seconde", "Architecture")
     schema = Path(__file__).resolve().parent / "uml-sequence.png"
     if schema.exists():
-        # Hauteur imposée, largeur déduite du ratio : l'image ne doit pas déborder.
-        s.shapes.add_picture(str(schema), MARGE + Inches(0.55), Inches(1.95),
-                             height=Inches(4.55))
-    bloc(s, MARGE, Inches(6.72), Inches(11.6), Inches(0.4),
-         "Diagramme de séquence UML — les deux appels à Mistral encadrent une recherche "
-         "vectorielle locale de 0,17 ms : c'est le réseau qui domine, pas l'algorithme.",
+        # Hauteur imposée, largeur déduite du ratio, puis centrage horizontal :
+        # l'image était calée sur la marge gauche et paraissait décentrée.
+        from PIL import Image
+
+        with Image.open(schema) as im:
+            ratio = im.width / im.height
+        hauteur = Inches(4.6)
+        largeur = Emu(int(hauteur * ratio))
+        s.shapes.add_picture(str(schema), int((L - largeur) / 2), Inches(1.92),
+                             width=largeur, height=hauteur)
+    bloc(s, MARGE, Inches(6.68), Inches(11.6), Inches(0.4),
+         "Les deux appels à Mistral encadrent une recherche vectorielle locale de "
+         "0,17 ms : c'est le réseau qui domine, pas l'algorithme.",
          taille=12.5, couleur=GRIS)
 
     # ---------- 6. Les données ----------
@@ -395,7 +419,8 @@ def construire() -> Presentation:
     tableau(s, Inches(4.1),
             ["Anomalie", "Exemple constaté", "Traitement"],
             [["Date aberrante", "un événement daté du 26 mars 2503", "rejet hors [1970, année+5]"],
-             ["Titre stylisé", "𝑮𝒆́𝒐𝒍𝒐𝒈𝒊𝒆𝒔 𝒅𝒆 𝒍'𝒂𝒃𝒔𝒆𝒏𝒄𝒆", "normalisation NFKC"],
+             ["Titre stylisé", "« Géologies » en caractères mathématiques Unicode",
+              "normalisation NFKC"],
              ["HTML et contenu de test", "<p>lorem</p>", "nettoyage et seuil de longueur"],
              ["Hors périmètre culturel", "35 offres d'emploi sur 300", "exclusion par agenda source"],
              ["Doublons de collecte", "1 341 doublons sur 1 600 appels", "déduplication par identifiant"]],
@@ -574,7 +599,7 @@ def construire() -> Presentation:
         ("86", "tests automatisés"),
         ("22", "contrôles de cohérence"),
         ("16", "scénarios de robustesse"),
-        ("17", "commits, une branche par étape"),
+        (str(compter_commits()), "commits, une branche par étape"),
     ], couleur=DATA)
     bloc(s, MARGE, Inches(5.95), Inches(11.6), Inches(0.9),
          "Le prétraitement est déterministe : rejouer un fichier brut reproduit les chunks à "
