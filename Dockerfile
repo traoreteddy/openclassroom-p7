@@ -2,6 +2,9 @@
 # Image de l'API RAG Puls-Events (démo locale et déploiement).
 # Build : docker build -t puls-events-rag .
 # Run   : docker run --rm -p 8000:8000 --env-file .env -v "$PWD/data:/app/data" puls-events-rag
+#
+# L'image sert l'API et son interface Streamlit : le service « ui » de
+# docker-compose.yml réutilise la même image avec une autre commande.
 
 FROM python:3.13-slim
 
@@ -33,7 +36,7 @@ RUN mkdir -p data/raw data/processed data/index
 # Mistral suffit si l'image doit rester légère.
 ENV HF_HOME=/app/.cache/huggingface
 
-EXPOSE 8000
+EXPOSE 8000 8501
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"

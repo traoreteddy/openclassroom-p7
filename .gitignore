@@ -22,6 +22,12 @@ data/index/*
 evaluation/results/*
 !evaluation/results/.gitkeep
 
+# Captures d'écran déposées à la racine — trois d'entre elles ont été
+# versionnées par mégarde via « git add -A ».
+/img*.png
+/*.png
+!docs/captures/*.png
+
 # Notebooks
 .ipynb_checkpoints/
 

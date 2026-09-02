@@ -1,4 +1,6 @@
-# Démarrage de l'API en une commande : docker compose up
+# Démarrage de l'API et de son interface : docker compose up
+#   API        http://localhost:8000/docs
+#   Interface  http://localhost:8501
 #
 # L'index FAISS et les données sont montés depuis l'hôte : l'image reste légère
 # et l'index survit à la reconstruction du conteneur.
@@ -22,3 +24,23 @@ services:
       timeout: 5s
       start_period: 15s
       retries: 3
+
+  ui:
+    # Même image que l'API : l'interface n'est qu'un client HTTP, elle ne
+    # duplique aucune logique métier et n'a donc aucune dépendance en propre.
+    build: .
+    image: puls-events-rag:latest
+    container_name: puls-events-ui
+    command: >
+      streamlit run src/puls_events_rag/ui/app.py
+      --server.port 8501 --server.address 0.0.0.0 --server.headless true
+    ports:
+      - "8501:8501"
+    environment:
+      # Nom du service Docker, et non 127.0.0.1 qui désignerait le conteneur.
+      API_BASE_URL: http://api:8000
+    env_file:
+      - .env
+    depends_on:
+      - api
+    restart: unless-stopped

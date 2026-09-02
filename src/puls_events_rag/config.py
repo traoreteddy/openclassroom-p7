@@ -72,6 +72,10 @@ class Settings(BaseSettings):
     llm_model: str = "mistral-small-latest"
 
     # API
+    # Adresse à laquelle l'interface Streamlit joint l'API. Dans Docker Compose,
+    # c'est le nom du service ; en local, 127.0.0.1.
+    api_base_url: str = "http://127.0.0.1:8000"
+
     # Jeton protégeant /rebuild. Vide = endpoint ouvert (mode POC local) ;
     # renseigné = en-tête X-API-Key obligatoire.
     rebuild_token: str = ""

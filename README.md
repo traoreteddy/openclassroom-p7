@@ -23,8 +23,15 @@ Question ──► recherche sémantique (FAISS) ──► 5 événements ──
 ```bash
 cp .env.example .env                              # y renseigner MISTRAL_API_KEY
 uv sync && uv run python scripts/rebuild_all.py --yes
-docker compose up                                 # API sur http://localhost:8000/docs
+docker compose up
 ```
+
+| | |
+|---|---|
+| **Interface** | http://localhost:8501 |
+| **API** — documentation Swagger | http://localhost:8000/docs |
+
+![Interface Streamlit](docs/captures/interface-streamlit.png)
 
 ## 📈 Ce que le système fait, mesuré
 
@@ -74,9 +81,11 @@ P7/
 │       ├── rag/                # Chaîne RAG
 │       │   ├── prompts.py      #   Prompts système
 │       │   └── chain.py        #   Assemblage retriever + LLM (LangChain)
-│       └── api/                # API HTTP
-│           ├── main.py         #   Application FastAPI (/health, /ask, /rebuild)
-│           └── schemas.py      #   Schémas Pydantic requêtes/réponses
+│       ├── api/                # API HTTP
+│       │   ├── main.py         #   Application FastAPI (/health, /ask, /rebuild)
+│       │   └── schemas.py      #   Schémas Pydantic requêtes/réponses
+│       └── ui/                 # Interface de démonstration
+│           └── app.py          #   Streamlit, cliente de l'API
 ├── scripts/
 │   ├── rebuild_all.py          # Tout reconstruire du vide à l'index (CLI)
 │   ├── collect_events.py       # Collecte + nettoyage + chunking (CLI)
@@ -254,7 +263,22 @@ curl -X POST http://127.0.0.1:8000/rebuild -H "X-API-Key: votre-jeton"
 
 **Documentation interactive** : http://127.0.0.1:8000/docs (Swagger, générée par FastAPI).
 
-### 9. Vérifier l'environnement
+### 9. Interroger le système par l'interface
+
+```bash
+uv run streamlit run src/puls_events_rag/ui/app.py     # http://localhost:8501
+```
+
+L'interface est un **client de l'API**, pas une seconde implémentation : elle appelle
+`/ask`, `/health` et `/rebuild` par HTTP, exactement comme le ferait une application
+tierce. La démonstration prouve donc que l'API fonctionne, et la logique métier reste à
+un seul endroit.
+
+Elle affiche l'état de l'index, trois questions d'exemple, la réponse rédigée, et chaque
+événement cité sous forme de fiche avec son lien Open Agenda et sa distance sémantique.
+Un panneau d'administration replié permet de reconstruire l'index, jeton à l'appui.
+
+### 10. Vérifier l'environnement
 
 ```bash
 uv run pytest tests/test_environment.py -v
@@ -271,16 +295,16 @@ pip install --no-cache-dir -r requirements.txt && pip install -e . --no-deps
 python -m pytest tests/test_environment.py
 ```
 
-### 10. Lancer les tests
+### 11. Lancer les tests
 
 ```bash
 uv run pytest
 ```
 
-### 11. Lancer l'API dans Docker
+### 12. Lancer l'API et l'interface dans Docker
 
 ```bash
-docker compose up                       # build + run, API sur http://localhost:8000
+docker compose up      # API sur :8000, interface sur :8501
 ```
 
 Ou sans Compose :
@@ -458,6 +482,7 @@ Le tracing LangSmith s'active par variables d'environnement (`LANGSMITH_TRACING=
 | Base vectorielle | FAISS |
 | Orchestration RAG | LangChain |
 | API | FastAPI + Uvicorn |
+| Interface | Streamlit (cliente de l'API) |
 | Qualité / tests | Ruff, Pytest |
 | Observabilité | LangSmith (tracing optionnel) |
 | Conteneurisation | Docker |
