@@ -15,7 +15,8 @@ Question ──► recherche sémantique (FAISS) ──► 5 événements ──
 | **Rapport technique** — Word, 10 sections du template imposé | [`docs/rapport-technique-puls-events-rag.docx`](docs/rapport-technique-puls-events-rag.docx) |
 | **Rapport technique** — version consultable en ligne | [claude.ai/code/artifact/e8e1dd5d](https://claude.ai/code/artifact/e8e1dd5d-cbda-46af-9399-d069a4c3a7de) |
 | **Support de soutenance** — 14 diapositives | [`docs/soutenance-puls-events-rag.pptx`](docs/soutenance-puls-events-rag.pptx) |
-| Générateurs des deux documents | [`docs/generate_rapport.py`](docs/generate_rapport.py) · [`docs/generate_presentation.py`](docs/generate_presentation.py) |
+| **Schémas UML** — composants et séquence | [`docs/uml-composants.png`](docs/uml-composants.png) · [`docs/uml-sequence.png`](docs/uml-sequence.png) |
+| Générateurs des trois documents | [`generate_rapport.py`](docs/generate_rapport.py) · [`generate_presentation.py`](docs/generate_presentation.py) · [`generate_uml.py`](docs/generate_uml.py) |
 
 ## ⚡ Démarrage en trois commandes
 
@@ -101,8 +102,11 @@ P7/
 └── docs/                       # Rapport technique et documentation
     ├── rapport-technique-….docx#   Rapport technique (Word, 10 sections)
     ├── soutenance-…​.pptx       #   Support de soutenance (14 diapositives)
+    ├── uml-composants.png/.svg #   Diagramme de composants UML
+    ├── uml-sequence.png/.svg   #   Diagramme de séquence UML
     ├── generate_rapport.py     #   Générateur du rapport Word
     ├── generate_presentation.py#   Générateur du support de soutenance
+    ├── generate_uml.py         #   Générateur des schémas UML
     ├── architecture.md         #   Architecture technique détaillée
     ├── api-source.md           #   Caractéristiques de l'API de collecte
     ├── index-vectoriel.md      #   Choix et mesures de l'index FAISS

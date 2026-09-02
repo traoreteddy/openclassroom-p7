@@ -17,6 +17,7 @@ from pathlib import Path
 
 from docx import Document
 from docx.enum.table import WD_TABLE_ALIGNMENT
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
@@ -224,6 +225,28 @@ def tableau(doc, entetes: list[str] | None, lignes: list[list[str]], taille=9):
 # Le rapport
 # --------------------------------------------------------------------------- #
 
+def figure(doc, fichier: str, legende: str, largeur_cm=16.2):
+    """Insère un schéma et sa légende, centrés."""
+    chemin = Path(__file__).resolve().parent / fichier
+    if not chemin.exists():
+        para(doc, f"[schéma manquant : {fichier} — lancer docs/generate_uml.py]",
+             couleur=ACCENT, italique=True)
+        return
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p.paragraph_format.space_before = Pt(8)
+    p.paragraph_format.space_after = Pt(3)
+    p.add_run().add_picture(str(chemin), width=Cm(largeur_cm))
+    lp = doc.add_paragraph()
+    lp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    lp.paragraph_format.space_after = Pt(12)
+    r = lp.add_run(legende)
+    r.font.size = Pt(8.5)
+    r.font.name = SANS
+    r.font.color.rgb = GRIS
+    r.italic = True
+
+
 def construire() -> Document:
     doc = Document()
     for section in doc.sections:
@@ -336,6 +359,26 @@ def construire() -> Document:
     para(doc, "Le système se lit en deux flux distincts, qui ne s'exécutent ni au même "
               "moment ni au même rythme.")
 
+    titre(doc, "Schéma global — diagramme de composants UML", 2)
+    figure(doc, "uml-composants.png",
+           "Figure 1 — Composants, interfaces fournies et requises, dépendances. "
+           "Les composants du cœur métier sont en orange, les systèmes externes en bleu.")
+    para(doc, "Le diagramme sépare trois zones : les **systèmes externes** dont le POC "
+              "dépend, le **pipeline d'indexation** qui s'exécute hors ligne, et la "
+              "**chaîne d'inférence** sollicitée à chaque question. La base vectorielle "
+              "est le point de rencontre : le pipeline l'écrit, la chaîne la lit.")
+
+    titre(doc, "Déroulé d'un appel — diagramme de séquence UML", 2)
+    figure(doc, "uml-sequence.png",
+           "Figure 2 — Traitement d'un POST /ask, du navigateur à la réponse validée. "
+           "Les deux fragments combinés marquent la déduplication et la validation "
+           "des sorties.")
+    para(doc, "Le diagramme fait apparaître ce que les tableaux de mesures ne montrent "
+              "pas : les **deux appels distants** à Mistral encadrent une recherche "
+              "vectorielle locale de 0,17 ms. C'est la latence réseau qui domine, pas "
+              "l'algorithme.")
+
+    titre(doc, "Vue synthétique des deux flux", 2)
     code(doc,
          "PIPELINE D'INDEXATION                    CHAÎNE D'INFÉRENCE\n"
          "hors ligne · une fois · ~1 min           temps réel · à chaque question · ~2,4 s\n"

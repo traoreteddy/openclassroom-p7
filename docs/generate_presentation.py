@@ -370,7 +370,19 @@ def construire() -> Presentation:
          "Sans cette séparation, répondre coûterait 32 secondes au lieu de 80 millisecondes.",
          taille=13, couleur=GRIS)
 
-    # ---------- 5. Les données ----------
+    # ---------- 5. Diagramme de séquence ----------
+    s = page(prs, "Le déroulé d'une question, seconde par seconde", "Architecture")
+    schema = Path(__file__).resolve().parent / "uml-sequence.png"
+    if schema.exists():
+        # Hauteur imposée, largeur déduite du ratio : l'image ne doit pas déborder.
+        s.shapes.add_picture(str(schema), MARGE + Inches(0.55), Inches(1.95),
+                             height=Inches(4.55))
+    bloc(s, MARGE, Inches(6.72), Inches(11.6), Inches(0.4),
+         "Diagramme de séquence UML — les deux appels à Mistral encadrent une recherche "
+         "vectorielle locale de 0,17 ms : c'est le réseau qui domine, pas l'algorithme.",
+         taille=12.5, couleur=GRIS)
+
+    # ---------- 6. Les données ----------
     s = page(prs, "Un catalogue réel, avec ses défauts", "Les données")
     chiffres(s, Inches(2.05), [
         ("1 233 842", "événements disponibles"),
@@ -389,7 +401,7 @@ def construire() -> Presentation:
              ["Doublons de collecte", "1 341 doublons sur 1 600 appels", "déduplication par identifiant"]],
             [Inches(2.9), Inches(4.9), Inches(3.8)])
 
-    # ---------- 6. Modèles et index ----------
+    # ---------- 7. Modèles et index ----------
     s = page(prs, "Des choix mesurés, pas supposés", "Modèles et index")
     bloc(s, MARGE, Inches(2.05), Inches(11.6), Inches(0.35),
          "Faut-il un index approché pour aller plus vite ?", taille=16, gras=True, couleur=ENCRE)
@@ -406,7 +418,7 @@ def construire() -> Presentation:
         ("mistral-small-latest, température 0,2.", "Le modèle ne raisonne pas, il met en forme des faits fournis."),
     ], taille=15)
 
-    # ---------- 7. API et Docker ----------
+    # ---------- 8. API et Docker ----------
     s = page(prs, "Exposé en HTTP, livré en conteneur", "Mise à disposition")
     tableau(s, Inches(2.1),
             ["Route", "Rôle", "Protection"],
@@ -428,7 +440,7 @@ def construire() -> Presentation:
          "dépendance d'embeddings locale. Isolée en extra optionnel — l'image n'appelle que Mistral.",
          taille=12.5, couleur=GRIS)
 
-    # ---------- 8. Démonstration ----------
+    # ---------- 9. Démonstration ----------
     s = page(prs, "Démonstration", "En direct")
     for i, (question, attendu) in enumerate([
             ("« Quels concerts de jazz puis-je voir à Paris ? »",
@@ -448,7 +460,7 @@ def construire() -> Presentation:
          "Index et conteneur en local. Seul l'appel de génération passe par le réseau — "
          "captures de secours prévues.", taille=12.5, couleur=GRIS)
 
-    # ---------- 9. Évaluation ----------
+    # ---------- 10. Évaluation ----------
     s = page(prs, "Ce que valent les réponses", "Résultats")
     chiffres(s, Inches(2.05), [
         ("10 / 10", "réponses jugées correctes"),
@@ -465,7 +477,7 @@ def construire() -> Presentation:
         ("Le juge s'est trompé trois fois sur dix.", "Il comparait des listes au lieu de vérifier la validité. Prompt corrigé, verdicts relisibles par un humain."),
     ], taille=15)
 
-    # ---------- 10. Une mesure basse expliquée ----------
+    # ---------- 11. Une mesure basse expliquée ----------
     s = page(prs, "Une mesure basse qui n'est pas un défaut", "Résultats")
     bloc(s, MARGE, Inches(2.1), Inches(11.6), Inches(0.5),
          "context_recall = 0,32 — la métrique compare les extraits récupérés à UNE réponse de référence.",
@@ -482,7 +494,7 @@ def construire() -> Presentation:
          "Une recommandation admet des dizaines de réponses correctes. D'où une métrique ajoutée "
          "qui vérifie une propriété — « est-ce du jazz ? » — plutôt qu'une liste : 0,943.")
 
-    # ---------- 11. Robustesse ----------
+    # ---------- 12. Robustesse ----------
     s = page(prs, "Deux vulnérabilités trouvées et corrigées", "Robustesse")
     for i, (titre, avant, apres) in enumerate([
             ("Injection directe, par la question",
@@ -506,7 +518,7 @@ def construire() -> Presentation:
          "16 scénarios adverses, tous conformes — chacun rejoué à chaque exécution du banc.",
          taille=13, couleur=GRIS)
 
-    # ---------- 12. Limites ----------
+    # ---------- 13. Limites ----------
     s = page(prs, "Ce que ce POC ne fait pas", "Limites")
     puces(s, Inches(2.15), [
         ("Paris uniquement.", "Le catalogue national compte 1,2 million d'événements ; la collecte est déjà paramétrée pour une liste de villes."),
@@ -517,7 +529,7 @@ def construire() -> Presentation:
         ("« Ce week-end » n'est pas résolu en dates.", "Le modèle s'appuie sur les périodes textuelles du contexte."),
     ], taille=15.5)
 
-    # ---------- 13. Perspectives ----------
+    # ---------- 14. Perspectives ----------
     s = page(prs, "Ce qu'il faudrait pour la production", "Perspectives")
     colonnes = [
         ("Court terme", [
@@ -549,7 +561,7 @@ def construire() -> Presentation:
             bloc(s, x + Inches(0.28), Inches(2.95 + j * 0.72), largeur - Inches(0.55),
                  Inches(0.7), "— " + item, taille=13, couleur=ENCRE_DOUCE, interligne=1.2)
 
-    # ---------- 14. Reproductibilité ----------
+    # ---------- 15. Reproductibilité ----------
     s = page(prs, "Reproductible en trois commandes", "Livraison")
     rectangle(s, MARGE, Inches(2.15), L - 2 * MARGE, Inches(1.9), ENCRE)
     bloc(s, MARGE + Inches(0.4), Inches(2.4), Inches(11), Inches(1.5),
