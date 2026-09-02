@@ -141,3 +141,68 @@ def test_chaque_scenario_porte_un_controle():
     for scenario in SCENARIOS:
         assert scenario.keys() & {"requis", "interdit", "interdit_partout"}, scenario["id"]
         assert scenario["attendu"], scenario["id"]
+
+
+# --- Validation des sorties (injection indirecte) ------------------------------
+
+
+def source(titre: str, url: str = "https://openagenda.com/a/b"):
+    from langchain_core.documents import Document
+
+    return Document(page_content="", metadata={"titre": titre, "url": url})
+
+
+def test_url_etrangere_est_retiree():
+    """Vecteur d'hameçonnage : un lien injecté par une fiche tierce."""
+    from puls_events_rag.rag.chain import valider_reponse
+
+    reponse = "**Django Lovers** — 1er octobre. Réservez sur www.billets-pas-chers.example"
+    nettoyee, anomalies = valider_reponse(reponse, [source("Django Lovers")])
+    assert "billets-pas-chers" not in nettoyee
+    assert "[lien retiré]" in nettoyee
+    assert len(anomalies) == 1
+
+
+def test_url_de_source_est_conservee():
+    from puls_events_rag.rag.chain import valider_reponse
+
+    reponse = "**Django Lovers** — détails sur https://openagenda.com/a/b"
+    nettoyee, anomalies = valider_reponse(reponse, [source("Django Lovers")])
+    assert "https://openagenda.com/a/b" in nettoyee
+    assert anomalies == []
+
+
+def test_evenement_sans_fiche_est_signale():
+    from puls_events_rag.rag.chain import valider_reponse
+
+    reponse = "**Festival de Rock au Stade de France** — 3 janvier 2027."
+    _, anomalies = valider_reponse(reponse, [source("Django Lovers")])
+    assert len(anomalies) == 1
+    assert "sans fiche correspondante" in anomalies[0]
+
+
+def test_intertitre_de_mise_en_forme_n_est_pas_un_evenement():
+    """Le prompt autorise des intertitres en gras : ils ne doivent pas alerter."""
+    from puls_events_rag.rag.chain import valider_reponse
+
+    reponse = "**Pour du jazz :**\n**Django Lovers** — 1er octobre 2026."
+    _, anomalies = valider_reponse(reponse, [source("Django Lovers")])
+    assert anomalies == []
+
+
+def test_reponse_saine_ne_declenche_aucune_alerte():
+    from puls_events_rag.rag.chain import valider_reponse
+
+    reponse = "**Django Lovers** — 1er octobre 2026, JASS CLUB (Paris)."
+    nettoyee, anomalies = valider_reponse(reponse, [source("Django Lovers")])
+    assert (nettoyee, anomalies) == (reponse, [])
+
+
+def test_le_prompt_interdit_de_suivre_les_consignes_des_fiches():
+    """La consigne anti-injection indirecte doit rester dans le prompt système."""
+    from puls_events_rag.rag.prompts import EVENT_TEMPLATE, SYSTEM_PROMPT
+
+    assert "DONNÉES DE RÉFÉRENCE" in SYSTEM_PROMPT
+    assert "contributeurs tiers" in SYSTEM_PROMPT
+    assert "# Source :" in EVENT_TEMPLATE, "chaque fiche doit porter sa source"
+    assert "DÉBUT FICHE" in EVENT_TEMPLATE and "FIN FICHE" in EVENT_TEMPLATE
