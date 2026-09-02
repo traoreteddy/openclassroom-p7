@@ -21,6 +21,10 @@ from pptx.util import Emu, Inches, Pt
 
 SORTIE = Path(__file__).resolve().parent / "soutenance-puls-events-rag.pptx"
 
+# Motifs de comptage, hors f-string : Python 3.11 y refuse les échappements.
+MOTIF_CONTROLE = r"r\.check\("
+MOTIF_SCENARIO = r'^        "id":'
+
 # Palette reprise du rapport technique, pour que les deux supports se répondent.
 ENCRE = RGBColor(0x1B, 0x24, 0x30)
 ENCRE_DOUCE = RGBColor(0x3C, 0x47, 0x57)
@@ -39,21 +43,53 @@ L, H = Inches(13.333), Inches(7.5)  # 16:9
 MARGE = Inches(0.85)
 
 
-def compter_commits() -> int:
-    """Nombre de commits, lu depuis git.
-
-    Le chiffre était écrit en dur et s'est retrouvé faux dès le commit suivant :
-    il est désormais relu à chaque génération.
-    """
+def _sortie_commande(commande: list[str]) -> str:
+    """Exécute une commande à la racine du dépôt et retourne sa sortie."""
     import subprocess
 
     try:
-        sortie = subprocess.run(["git", "rev-list", "--count", "HEAD"],
-                                capture_output=True, text=True, check=True,
-                                cwd=Path(__file__).resolve().parent)
-        return int(sortie.stdout.strip())
-    except (subprocess.CalledProcessError, ValueError, FileNotFoundError):
+        resultat = subprocess.run(commande, capture_output=True, text=True, check=False,
+                                  cwd=Path(__file__).resolve().parents[1])
+        return resultat.stdout
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def compter_commits() -> int:
+    """Nombre de commits, lu depuis git.
+
+    Les chiffres de cette page étaient écrits en dur et se sont retrouvés faux
+    dès le commit suivant. Ils sont désormais relus à chaque génération.
+    """
+    sortie = _sortie_commande(["git", "rev-list", "--count", "HEAD"]).strip()
+    return int(sortie) if sortie.isdigit() else 0
+
+
+def compter_tests() -> int:
+    """Nombre de tests collectés par pytest."""
+    import re
+
+    sortie = _sortie_commande(["uv", "run", "pytest", "--collect-only", "-q"])
+    trouve = re.search(r"(\d+) tests? collected", sortie)
+    return int(trouve.group(1)) if trouve else 0
+
+
+def compter_modules() -> int:
+    """Nombre de modules Python suivis par git."""
+    sortie = _sortie_commande(["git", "ls-files", "*.py"])
+    return len([ligne for ligne in sortie.splitlines() if ligne.strip()])
+
+
+def compter_occurrences(fichier: str, motif: str) -> int:
+    """Occurrences d'un motif dans un fichier du dépôt."""
+    import re
+
+    chemin = Path(__file__).resolve().parents[1] / fichier
+    if not chemin.exists():
         return 0
+    # MULTILINE : sans lui, « ^ » ne vaut qu'au tout début du fichier et le
+    # comptage renvoie zéro sans que rien ne le signale.
+    return len(re.findall(motif, chemin.read_text(encoding="utf-8"), re.MULTILINE))
 
 
 def bloc(slide, x, y, w, h, texte, taille=18, gras=False, couleur=ENCRE,
@@ -596,9 +632,11 @@ def construire() -> Presentation:
          "docker compose up",
          taille=15, couleur=RGBColor(0xE7, 0xEB, 0xF1), police="Consolas", interligne=1.6)
     chiffres(s, Inches(4.35), [
-        ("86", "tests automatisés"),
-        ("22", "contrôles de cohérence"),
-        ("16", "scénarios de robustesse"),
+        (str(compter_tests()), "tests automatisés"),
+        (str(compter_occurrences("scripts/check_dataset.py", MOTIF_CONTROLE)),
+         "contrôles de cohérence"),
+        (str(compter_occurrences("evaluation/robustness.py", MOTIF_SCENARIO)),
+         "scénarios de robustesse"),
         (str(compter_commits()), "commits, une branche par étape"),
     ], couleur=DATA)
     bloc(s, MARGE, Inches(5.95), Inches(11.6), Inches(0.9),
