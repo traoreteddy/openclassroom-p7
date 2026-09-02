@@ -71,6 +71,52 @@ class RebuildResponse(BaseModel):
     duration_seconds: float
 
 
+class IndexInfo(BaseModel):
+    """Caractéristiques techniques de l'index vectoriel."""
+
+    chunks: int
+    events: int
+    dimension: int | None = None
+    index_type: str | None = None
+    embedding_provider: str | None = None
+    embedding_model: str | None = None
+    chunk_size: int | None = None
+    chunk_overlap: int | None = None
+    built_at: str | None = Field(default=None, description="Date de construction (ISO)")
+
+
+class CorpusInfo(BaseModel):
+    """Périmètre métier du catalogue interrogeable."""
+
+    cities: list[str] = Field(description="Villes couvertes par l'index")
+    period_start: str | None = Field(default=None, description="Début de la période, ISO")
+    period_end: str | None = Field(default=None, description="Fin de la période, ISO")
+    events: int
+    upcoming_events: int = Field(description="Événements dont la date de fin est à venir")
+    with_url: int = Field(description="Événements disposant d'une fiche source")
+    with_coordinates: int
+
+
+class SourceAgenda(BaseModel):
+    """Agenda Open Agenda ayant alimenté le catalogue."""
+
+    agenda: str
+    events: int
+
+
+class MetadataResponse(BaseModel):
+    """Description du catalogue, pour qu'une équipe métier sache ce qu'elle interroge."""
+
+    index: IndexInfo
+    corpus: CorpusInfo
+    sources: list[SourceAgenda] = Field(
+        description="Agendas source, du plus fourni au moins fourni"
+    )
+    sources_total: int = Field(description="Nombre total d'agendas, avant pagination")
+    limit: int
+    offset: int
+
+
 class HealthResponse(BaseModel):
     """État du service et de l'index."""
 

@@ -31,6 +31,7 @@ docker compose up
 |---|---|
 | **Interface** | http://localhost:8501 |
 | **API** — documentation Swagger | http://localhost:8000/docs |
+| **Périmètre du catalogue** | http://localhost:8000/metadata |
 
 ![Interface Streamlit](docs/captures/interface-streamlit.png)
 
@@ -92,6 +93,7 @@ P7/
 │   ├── collect_events.py       # Collecte + nettoyage + chunking (CLI)
 │   ├── check_dataset.py        # Contrôle de cohérence du jeu de données
 │   ├── benchmark_search.py     # Banc d'essai des algorithmes FAISS
+│   ├── estimate_cost.py        # Coût d'exploitation, sur volumes mesurés
 │   └── build_index.py          # Pipeline complet d'indexation (CLI)
 ├── notebooks/                  # Explorations (données, embeddings, évaluation)
 ├── data/                       # Données locales (non versionnées)
@@ -260,6 +262,47 @@ L'endpoint se protège dès que `REBUILD_TOKEN` est configuré :
 
 ```bash
 curl -X POST http://127.0.0.1:8000/rebuild -H "X-API-Key: votre-jeton"
+```
+
+Connaître le périmètre du catalogue avant de l'interroger :
+
+```bash
+curl "http://127.0.0.1:8000/metadata?limit=3"
+```
+
+```json
+{
+  "index":  {"chunks": 2842, "events": 896, "dimension": 1024, "index_type": "flat"},
+  "corpus": {"cities": ["Paris"], "events": 896, "upcoming_events": 668,
+             "with_url": 896, "with_coordinates": 896},
+  "sources": [{"agenda": "Cité des sciences et de l'industrie", "events": 255}],
+  "sources_total": 59, "limit": 3, "offset": 0
+}
+```
+
+La liste des agendas source est **paginée** (`limit`, `offset`) : le catalogue en compte 59.
+
+**Depuis Python** :
+
+```python
+import httpx
+
+API = "http://localhost:8000"
+
+perimetre = httpx.get(f"{API}/metadata", params={"limit": 5}).json()
+print(perimetre["corpus"]["cities"], perimetre["corpus"]["upcoming_events"])
+
+reponse = httpx.post(f"{API}/ask", timeout=90,
+                     json={"question": "Un concert de jazz à Paris ?", "top_k": 3})
+reponse.raise_for_status()
+resultat = reponse.json()
+
+print(resultat["answer"])
+for source in resultat["sources"]:
+    print(f'- {source["titre"]} — {source["periode"]} — {source["url"]}')
+
+if resultat["warnings"]:          # anomalie détectée dans la réponse du modèle
+    print("Avertissements :", resultat["warnings"])
 ```
 
 **Documentation interactive** : http://127.0.0.1:8000/docs (Swagger, générée par FastAPI).
@@ -449,6 +492,54 @@ réel. Détails et relevés dans [`docs/index-vectoriel.md`](docs/index-vectorie
 ```bash
 uv run python scripts/benchmark_search.py
 ```
+
+## 💰 Coût d'exploitation
+
+```bash
+uv run python scripts/estimate_cost.py --questions-par-jour 1000
+```
+
+Volumes mesurés, non supposés : le corpus fait 989 965 caractères, soit ~301 000 jetons
+au ratio de 3,29 caractères par jeton relevé sur un prompt réel. Une question consomme
+**1 804 jetons d'entrée et 196 de sortie**.
+
+| Questions par jour | Total mensuel |
+|---|---|
+| 100 | 2,07 $ |
+| 1 000 | **12,58 $** |
+| 10 000 | 117,72 $ |
+| 100 000 | 1 169,10 $ |
+
+Reconstruction quotidienne de l'index comprise (0,030 $ l'unité). À cette échelle, le coût
+des modèles n'est pas un obstacle — servir mille questions par jour coûte moins que
+l'hébergement du conteneur.
+
+**Le point de bascule** est ailleurs : étendre le catalogue à la France entière
+représente ~414 millions de jetons, soit **41 $ par reconstruction complète** et
+**1 243 $ par mois** si elle est quotidienne. L'indexation incrémentale devient alors une
+condition de viabilité, pas un raffinement.
+
+### Pourquoi Mistral
+
+Tarifs relevés le 2 septembre 2026, en dollars par million de jetons :
+
+| | Embeddings | Génération entrée | Génération sortie |
+|---|---|---|---|
+| Mistral | 0,10 $ | 0,15 $ | 0,60 $ |
+| OpenAI | **0,02 $** | 0,15 $ | 0,60 $ |
+
+La génération est **au tarif identique** et l'embedding OpenAI est **cinq fois moins
+cher** : l'argument économique ne plaide pas pour Mistral, et il serait malhonnête de le
+présenter ainsi. Ce qui a décidé du choix :
+
+- **Souveraineté** — questions et descriptions transitent par l'API du fournisseur ; un
+  fournisseur européen simplifie la conformité RGPD.
+- **Qualité en français** — corpus, questions et réponses sont en français ; la fidélité
+  mesurée à 0,943 le confirme.
+- **Adéquation** — la génération est une reformulation contrainte ; un petit modèle suffit.
+- **Réversibilité** — le fournisseur est isolé derrière `get_embedding_model()` et
+  `get_llm()` : en changer revient à modifier une variable d'environnement et à
+  reconstruire l'index.
 
 ## 🔀 Fournisseurs d'embeddings
 

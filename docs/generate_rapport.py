@@ -592,6 +592,36 @@ def construire() -> Document:
               "reconstruire l'index, les dimensions différant (1 024 contre 384) ; "
               "load_index() refuse explicitement un index construit avec l'autre fournisseur.")
 
+    titre(doc, "Le coût n'est pas l'argument", 3)
+    para(doc, "Tarifs relevés le 2 septembre 2026 sur les pages publiques des deux "
+              "fournisseurs, en dollars par million de jetons :")
+    tableau(doc, ["Modèle", "Embeddings", "Génération entrée", "Génération sortie"], [
+        ["Mistral", "0,10 $ (mistral-embed)", "0,15 $ (mistral-small)", "0,60 $"],
+        ["OpenAI", "0,02 $ (embedding-3-small)", "0,15 $ (gpt-4o-mini)", "0,60 $"],
+    ])
+    para(doc, "La génération est **au tarif identique**, et l'embedding OpenAI est **cinq "
+              "fois moins cher**. Sur notre corpus, cela représente 3,0 centimes contre "
+              "0,6 centime par reconstruction complète : un écart réel en pourcentage, "
+              "négligeable en valeur absolue. **L'argument économique ne plaide donc pas "
+              "pour Mistral**, et il serait malhonnête de le présenter ainsi.")
+
+    titre(doc, "Ce qui a réellement décidé du choix", 3)
+    puce(doc, "**Souveraineté des données.** Les questions des utilisateurs de "
+              "Puls-Events et les descriptions d'événements transitent par l'API du "
+              "fournisseur. Un fournisseur européen simplifie la conformité RGPD : pas de "
+              "transfert hors Union, pas de clauses contractuelles types à instruire.")
+    puce(doc, "**Qualité en français.** Les événements, les questions et les réponses sont "
+              "en français. La qualité constatée sur les réponses produites est bonne, et "
+              "la fidélité mesurée à 0,943 le confirme.")
+    puce(doc, "**Adéquation du modèle à la tâche.** La génération est une reformulation "
+              "contrainte : le modèle ne raisonne pas, il met en forme des faits fournis. "
+              "Un modèle de petite taille suffit, et un modèle plus grand coûterait "
+              "davantage sans améliorer la fidélité.")
+    puce(doc, "**Réversibilité.** Le fournisseur est isolé derrière deux fonctions, "
+              "get_embedding_model() et get_llm(). En basculer un revient à changer une "
+              "variable d'environnement et à reconstruire l'index — l'architecture ne fait "
+              "aucun pari sur Mistral.")
+
     titre(doc, "Prompting", 2)
     para(doc, "Le prompt porte l'essentiel de la fidélité. Sa structure :")
     code(doc,
@@ -696,10 +726,27 @@ def construire() -> Document:
               "valider et traduire les erreurs en codes de statut.")
     tableau(doc, ["Méthode", "Route", "Rôle"], [
         ["GET", "/health", "État du service et de l'index — répond même sans index"],
+        ["GET", "/metadata", "Périmètre du catalogue : villes, période, volumétrie, sources"],
         ["POST", "/ask", "Question → réponse générée et sources vérifiables"],
         ["POST", "/rebuild", "Reconstruction complète de l'index, protégée par jeton"],
         ["GET", "/docs", "Documentation Swagger interactive"],
     ])
+    para(doc, "**/metadata** répond à une question d'usage métier : avant de se fier à une "
+              "réponse, une équipe produit doit savoir quelles villes et quelle période le "
+              "catalogue couvre, et d'où viennent les événements. La liste des agendas "
+              "source est **paginée** par `limit` et `offset` : le catalogue en compte 59, "
+              "et tout renvoyer alourdirait la réponse sans servir l'appelant.")
+    code(doc,
+         'GET /metadata?limit=3\n'
+         '{\n'
+         '  "index":  {"chunks": 2842, "events": 896, "dimension": 1024,\n'
+         '             "index_type": "flat", "embedding_model": "mistral-embed"},\n'
+         '  "corpus": {"cities": ["Paris"], "events": 896, "upcoming_events": 668,\n'
+         '             "with_url": 896, "with_coordinates": 896},\n'
+         '  "sources": [{"agenda": "Cité des sciences et de l\'industrie", "events": 255},\n'
+         '              {"agenda": "Bicentenaire de la Photographie", "events": 160}],\n'
+         '  "sources_total": 59, "limit": 3, "offset": 0\n'
+         '}')
 
     titre(doc, "Exemple d'appel", 2)
     code(doc,
@@ -721,10 +768,30 @@ def construire() -> Document:
          '  "warnings": []\n'
          '}')
 
+    titre(doc, "Appel depuis Python", 2)
+    code(doc,
+         'import httpx\n\n'
+         'API = "http://localhost:8000"\n\n'
+         '# Ce que couvre le catalogue, avant de l\'interroger\n'
+         'perimetre = httpx.get(f"{API}/metadata", params={"limit": 5}).json()\n'
+         'print(perimetre["corpus"]["cities"], perimetre["corpus"]["upcoming_events"])\n\n'
+         '# Poser une question\n'
+         'reponse = httpx.post(f"{API}/ask", timeout=90,\n'
+         '                     json={"question": "Un concert de jazz à Paris ?",\n'
+         '                           "top_k": 3})\n'
+         'reponse.raise_for_status()\n'
+         'resultat = reponse.json()\n\n'
+         'print(resultat["answer"])\n'
+         'for source in resultat["sources"]:\n'
+         '    print(f\'- {source["titre"]} — {source["periode"]} — {source["url"]}\')\n\n'
+         '# Une liste non vide signale une anomalie détectée dans la réponse\n'
+         'if resultat["warnings"]:\n'
+         '    print("Avertissements :", resultat["warnings"])')
+
     titre(doc, "Gestion des erreurs", 2)
     tableau(doc, ["Code", "Situation", "Comportement"], [
-        ["422", "Question absente, vide, trop courte ou longue ; top_k hors bornes", "Rejet par Pydantic avant le code métier"],
-        ["503", "Index absent, ou clé d'API manquante", "Message indiquant la marche à suivre"],
+        ["422", "Question absente, vide, trop courte ou longue ; top_k ou pagination hors bornes", "Rejet par Pydantic avant le code métier"],
+        ["503", "Index absent, corpus absent, ou clé d'API manquante", "Message indiquant la marche à suivre"],
         ["502", "Service de génération injoignable", "Réponse générique, exception journalisée"],
         ["401", "/rebuild sans jeton valide", "Comparaison en temps constant (compare_digest)"],
     ])
@@ -890,6 +957,35 @@ def construire() -> Document:
     puce(doc, f"**Le contrôle qualité.** {controles} contrôles de cohérence avant "
               f"vectorisation, {compter_tests()} tests, bancs d'évaluation et de "
               "robustesse reproductibles.")
+
+    titre(doc, "Coût d'exploitation en production", 2)
+    para(doc, "Les volumes ne sont pas supposés : le corpus compte 989 965 caractères, "
+              "soit environ 301 000 jetons au ratio de 3,29 caractères par jeton mesuré "
+              "sur un prompt français réel. Une question consomme **1 804 jetons "
+              "d'entrée et 196 de sortie**, relevés sur un appel effectif. "
+              "`scripts/estimate_cost.py` reproduit ce calcul.")
+    tableau(doc, ["Poste", "Volume", "Coût"], [
+        ["Reconstruction complète de l'index", "301 000 jetons d'embedding", "0,030 $"],
+        ["Une question", "1 804 + 196 jetons", "0,000389 $"],
+        ["1 000 questions", "", "0,39 $"],
+    ])
+    tableau(doc, ["Questions par jour", "Génération par mois", "Total mensuel"], [
+        ["100", "1,17 $", "2,07 $"],
+        ["1 000", "11,68 $", "12,58 $"],
+        ["10 000", "116,82 $", "117,72 $"],
+        ["100 000", "1 168,20 $", "1 169,10 $"],
+    ])
+    para(doc, "Reconstruction quotidienne comprise. À l'échelle du POC, **le coût des "
+              "modèles n'est pas un obstacle** : servir mille questions par jour revient "
+              "à une douzaine de dollars par mois, moins que l'hébergement du conteneur.")
+
+    encadre(doc, "Le point de bascule",
+            "Étendre le catalogue à la France entière change la nature du problème : "
+            "1 233 842 événements représentent environ **414 millions de jetons**, soit "
+            "**41 $ par reconstruction complète** et **1 243 $ par mois** si elle est "
+            "quotidienne. L'indexation incrémentale — ne vectoriser que les événements "
+            "nouveaux ou modifiés — cesse alors d'être un raffinement pour devenir la "
+            "condition de viabilité économique.")
 
     titre(doc, "Limites du POC", 2)
     tableau(doc, ["Dimension", "Limite constatée"], [
