@@ -13,8 +13,8 @@ MODULES_REQUIS = [
     "faiss",                              # base vectorielle
     "langchain",                          # orchestration
     "langchain_community.vectorstores",   # intégration FAISS
+    "langchain_text_splitters",           # découpage en chunks
     "langchain_mistralai",                # embeddings + LLM Mistral (par défaut)
-    "langchain_huggingface",              # embeddings locaux (alternative)
     "fastapi",                            # API
     "uvicorn",                            # serveur ASGI
     "pydantic_settings",                  # configuration / .env
@@ -45,13 +45,21 @@ def test_integration_faiss_langchain():
     assert hasattr(FAISS, "load_local")
 
 
-def test_fournisseurs_embeddings_disponibles():
-    """Les deux fournisseurs d'embeddings du POC doivent être instanciables."""
-    from langchain_huggingface import HuggingFaceEmbeddings
+def test_fournisseur_embeddings_par_defaut():
+    """Le fournisseur Mistral doit toujours être disponible."""
     from langchain_mistralai import MistralAIEmbeddings
 
     assert hasattr(MistralAIEmbeddings, "embed_documents")
-    assert hasattr(HuggingFaceEmbeddings, "embed_documents")
+
+
+def test_fournisseur_embeddings_local_si_installe():
+    """HuggingFace est un extra optionnel : absent de l'image Docker, qui
+    n'appelle que Mistral et n'a pas à embarquer torch et la pile CUDA."""
+    huggingface = pytest.importorskip(
+        "langchain_huggingface",
+        reason="extra optionnel — installer avec : uv sync --extra huggingface",
+    )
+    assert hasattr(huggingface.HuggingFaceEmbeddings, "embed_documents")
 
 
 def test_package_projet_importable():
