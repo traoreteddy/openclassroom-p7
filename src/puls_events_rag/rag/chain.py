@@ -103,39 +103,52 @@ def retrieve_events(question: str, k: int | None = None) -> list[Document]:
     return retenus
 
 
+def format_event(document: Document, numero: int = 1) -> str:
+    """Met en forme un événement : titre, date et lieu viennent des métadonnées.
+
+    Le ``page_content`` d'un chunk ne porte que sa part de description ; le titre
+    et la date, eux, sont dans les métadonnées. Un contexte bâti sur le seul
+    ``page_content`` priverait le modèle — et l'évaluation — de ces éléments.
+    """
+    meta = document.metadata
+    details = ""
+    if meta.get("age_min") is not None:
+        details += f"Âge minimum : {meta['age_min']} ans\n"
+    if meta.get("accessibilite"):
+        details += f"Accessibilité : {', '.join(meta['accessibilite'])}\n"
+    if meta.get("mots_cles"):
+        details += f"Mots-clés : {', '.join(meta['mots_cles'][:6])}\n"
+
+    description = document.page_content
+    if "Description :" in description:
+        description = description.split("Description :", 1)[1].strip()
+
+    return EVENT_TEMPLATE.format(
+        numero=numero,
+        titre=meta.get("titre", "(sans titre)"),
+        periode=meta.get("periode", "date non précisée"),
+        lieu=meta.get("lieu") or "lieu non précisé",
+        adresse=f", {meta['adresse']}" if meta.get("adresse") else "",
+        ville=meta.get("ville", ""),
+        details=details,
+        description=description,
+    )
+
+
+def format_context_blocks(documents: list[Document]) -> list[str]:
+    """Un bloc de contexte par événement.
+
+    Utilisé par l'évaluation : les métriques Ragas doivent porter sur les
+    contextes réellement soumis au modèle, pas sur le texte brut des chunks.
+    """
+    return [format_event(d, numero) for numero, d in enumerate(documents, start=1)]
+
+
 def format_context(documents: list[Document]) -> str:
     """Met en forme les événements récupérés pour le prompt."""
     if not documents:
         return "(aucun événement ne correspond à cette recherche)"
-
-    blocs = []
-    for numero, document in enumerate(documents, start=1):
-        meta = document.metadata
-        details = ""
-        if meta.get("age_min") is not None:
-            details += f"Âge minimum : {meta['age_min']} ans\n"
-        if meta.get("accessibilite"):
-            details += f"Accessibilité : {', '.join(meta['accessibilite'])}\n"
-        if meta.get("mots_cles"):
-            details += f"Mots-clés : {', '.join(meta['mots_cles'][:6])}\n"
-
-        # La description est extraite du texte du chunk, qui porte déjà les
-        # champs nommés produits au prétraitement.
-        description = document.page_content
-        if "Description :" in description:
-            description = description.split("Description :", 1)[1].strip()
-
-        blocs.append(EVENT_TEMPLATE.format(
-            numero=numero,
-            titre=meta.get("titre", "(sans titre)"),
-            periode=meta.get("periode", "date non précisée"),
-            lieu=meta.get("lieu") or "lieu non précisé",
-            adresse=f", {meta['adresse']}" if meta.get("adresse") else "",
-            ville=meta.get("ville", ""),
-            details=details,
-            description=description,
-        ))
-    return "\n\n".join(blocs)
+    return "\n\n".join(format_context_blocks(documents))
 
 
 def to_sources(documents: list[Document]) -> list[dict]:
