@@ -1,6 +1,31 @@
-# Puls-Events RAG — Assistant intelligent de recommandation d'événements culturels
+# Puls-Events RAG — Assistant de recommandation d'événements culturels
 
-POC (Proof of Concept) d'un système **RAG** (Retrieval-Augmented Generation) développé dans le cadre du projet 7 du parcours OpenClassrooms, pour le compte de **Puls-Events**.
+POC d'un système **RAG** (Retrieval-Augmented Generation) qui répond en langage naturel
+à des questions sur les événements culturels, à partir du catalogue **Open Agenda** et
+sans jamais inventer d'événement. Projet 7 du parcours OpenClassrooms, pour **Puls-Events**.
+
+```
+Question ──► recherche sémantique (FAISS) ──► 5 événements ──► Mistral ──► réponse + sources
+```
+
+## ⚡ Démarrage en trois commandes
+
+```bash
+cp .env.example .env                              # y renseigner MISTRAL_API_KEY
+uv sync && uv run python scripts/rebuild_all.py --yes
+docker compose up                                 # API sur http://localhost:8000/docs
+```
+
+## 📈 Ce que le système fait, mesuré
+
+| | |
+|---|---|
+| Événements indexés | 896 événements, 2 842 chunks vectorisés |
+| Réponses jugées correctes | **10 / 10** sur le jeu de test annoté |
+| Fidélité aux sources (`faithfulness`) | **0,943** — le système n'invente pas |
+| Scénarios de robustesse | **16 / 16** conformes |
+| Temps de réponse | ~2,4 s, dont 80 ms d'embedding et 0,17 ms de recherche |
+| Tests automatisés | 85 tests, `ruff` sans avertissement |
 
 ## 🎯 Objectifs
 
@@ -238,11 +263,23 @@ uv run pytest
 ### 11. Lancer l'API dans Docker
 
 ```bash
+docker compose up                       # build + run, API sur http://localhost:8000
+```
+
+Ou sans Compose :
+
+```bash
 docker build -t puls-events-rag .
 docker run --rm -p 8000:8000 --env-file .env -v "$PWD/data:/app/data" puls-events-rag
 ```
 
-L'index FAISS est monté depuis `data/`, il n'est donc pas embarqué dans l'image.
+**Image de 1,58 Go, construite en 1 min 40.** L'index FAISS est monté depuis `data/` et
+n'est pas embarqué dans l'image, qui reste ainsi indépendante du corpus.
+
+Le fournisseur d'embeddings HuggingFace est un **extra optionnel** (`uv sync --extra
+huggingface`), délibérément absent de l'image : il tire `torch` et, sous Linux, toute la
+pile CUDA de NVIDIA — plusieurs gigaoctets inutiles pour une image qui n'appelle que
+l'API Mistral.
 
 ## 📊 Évaluation
 

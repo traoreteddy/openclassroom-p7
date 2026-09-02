@@ -1,0 +1,24 @@
+# Démarrage de l'API en une commande : docker compose up
+#
+# L'index FAISS et les données sont montés depuis l'hôte : l'image reste légère
+# et l'index survit à la reconstruction du conteneur.
+
+services:
+  api:
+    build: .
+    image: puls-events-rag:latest
+    container_name: puls-events-rag
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
