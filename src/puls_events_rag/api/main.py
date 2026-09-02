@@ -1,31 +1,202 @@
-"""API FastAPI exposant le système RAG.
+"""API REST exposant le système RAG de recommandation d'événements.
+
+La logique métier vit entièrement dans ``puls_events_rag.rag`` et
+``puls_events_rag.vectorstore`` : ce module ne fait que l'exposer en HTTP,
+valider les entrées et traduire les erreurs en codes de statut.
 
 Lancement : uvicorn puls_events_rag.api.main:app --reload
+Documentation interactive : http://127.0.0.1:8000/docs
 """
 
-from fastapi import FastAPI, HTTPException
+from __future__ import annotations
 
-from puls_events_rag.api.schemas import AskRequest, AskResponse, RebuildResponse
+import json
+import logging
+import secrets
+import time
+from contextlib import asynccontextmanager
+
+from fastapi import Depends, FastAPI, Header, HTTPException, status
+
+from puls_events_rag.api.schemas import (
+    AskRequest,
+    AskResponse,
+    HealthResponse,
+    RebuildResponse,
+)
+from puls_events_rag.config import INDEX_DIR, PROCESSED_DATA_DIR, settings
+from puls_events_rag.ingestion import open_agenda
+from puls_events_rag.ingestion.open_agenda import fetch_events, save_raw_events
+from puls_events_rag.ingestion.preprocessing import chunk_documents, clean_events
+from puls_events_rag.rag.chain import answer_question, reset_cache
+from puls_events_rag.vectorstore.faiss_store import build_index
+
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Charge l'index au démarrage plutôt qu'à la première question.
+
+    Sans ce préchargement, le premier utilisateur paierait les ~580 ms de
+    lecture de l'index en plus du temps de réponse habituel.
+    """
+    try:
+        from puls_events_rag.rag.chain import _get_store
+
+        _get_store()
+        logger.info("Index chargé au démarrage")
+    except (FileNotFoundError, ValueError) as exc:
+        logger.warning("Index indisponible au démarrage : %s", exc)
+    yield
+
 
 app = FastAPI(
     title="Puls-Events RAG API",
-    description="Assistant intelligent de recommandation d'événements culturels",
-    version="0.1.0",
+    description=(
+        "Assistant de recommandation d'événements culturels.\n\n"
+        "Les réponses sont générées par un modèle Mistral à partir des seuls "
+        "événements Open Agenda indexés dans FAISS, et accompagnées de leurs "
+        "sources vérifiables."
+    ),
+    version="1.0.0",
+    lifespan=lifespan,
 )
 
 
-@app.get("/health")
-def health() -> dict:
-    return {"status": "ok"}
+def verifier_jeton(x_api_key: str | None = Header(default=None)) -> None:
+    """Protège les endpoints d'administration.
+
+    Tant que ``REBUILD_TOKEN`` n'est pas défini, l'endpoint reste ouvert : c'est
+    le mode POC en local. Dès qu'un jeton est configuré, il devient obligatoire.
+    La comparaison est faite en temps constant pour ne pas fuiter le jeton.
+    """
+    if not settings.rebuild_token:
+        return
+    if not x_api_key or not secrets.compare_digest(x_api_key, settings.rebuild_token):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Jeton d'administration invalide ou absent (en-tête X-API-Key).",
+        )
 
 
-@app.post("/ask", response_model=AskResponse)
+@app.get("/health", response_model=HealthResponse, tags=["Service"])
+def health() -> HealthResponse:
+    """État du service et disponibilité de l'index.
+
+    Utilisable comme sonde de vivacité : répond même sans index, en le signalant.
+    """
+    meta_path = INDEX_DIR / "index_meta.json"
+    if not meta_path.exists():
+        return HealthResponse(status="ok", index_ready=False)
+
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    return HealthResponse(
+        status="ok",
+        index_ready=True,
+        chunks_indexed=meta.get("chunks"),
+        embedding_provider=meta.get("embedding_provider"),
+    )
+
+
+@app.post("/ask", response_model=AskResponse, tags=["RAG"])
 def ask(request: AskRequest) -> AskResponse:
-    """Répond à une question utilisateur à partir des événements indexés."""
-    raise HTTPException(status_code=501, detail="TODO: brancher rag.chain.answer_question")
+    """Répond à une question sur les événements culturels indexés.
+
+    Recherche les événements sémantiquement proches de la question dans l'index
+    FAISS, puis demande au modèle Mistral de rédiger une recommandation à partir
+    de ces seuls événements.
+
+    La réponse est accompagnée des sources réellement utilisées, avec leur URL
+    Open Agenda : l'utilisateur peut vérifier chaque événement cité.
+
+    Codes d'erreur :
+    - **422** : question absente, trop courte ou trop longue
+    - **503** : index absent — lancer `/rebuild` ou `scripts/build_index.py`
+    - **502** : le modèle de génération est injoignable
+    """
+    try:
+        resultat = answer_question(request.question, k=request.top_k)
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Aucun index vectoriel disponible. Lancez /rebuild au préalable.",
+        ) from exc
+    except ValueError as exc:
+        # Clé d'API manquante ou index construit avec un autre fournisseur.
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        ) from exc
+    except Exception as exc:
+        logger.exception("Échec de génération de la réponse")
+        # Le détail de l'exception peut contenir des éléments de configuration :
+        # on journalise côté serveur et on reste générique côté client.
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Le service de génération est momentanément indisponible.",
+        ) from exc
+
+    return AskResponse(**resultat)
 
 
-@app.post("/rebuild", response_model=RebuildResponse)
+@app.post(
+    "/rebuild",
+    response_model=RebuildResponse,
+    tags=["Administration"],
+    dependencies=[Depends(verifier_jeton)],
+)
 def rebuild() -> RebuildResponse:
-    """Reconstruit l'index FAISS (collecte -> nettoyage -> embeddings -> index)."""
-    raise HTTPException(status_code=501, detail="TODO: brancher le pipeline d'indexation")
+    """Reconstruit l'index vectoriel à partir de données fraîchement collectées.
+
+    Enchaîne collecte Open Agenda, nettoyage, chunking, vectorisation et
+    indexation, en suivant le périmètre défini dans la configuration
+    (`CITIES`, `HISTORY_DAYS`, `PERIOD_DAYS`, `EVENT_TYPES`, `MAX_EVENTS`).
+
+    Opération longue — de l'ordre de la minute — et coûteuse en appels d'API.
+    Protégée par l'en-tête `X-API-Key` dès que `REBUILD_TOKEN` est configuré.
+
+    Les caches de la chaîne RAG sont vidés à la fin : les questions suivantes
+    utilisent le nouvel index sans redémarrage du service.
+
+    Note : toutes les dépendances lourdes (FAISS, torch via les text splitters)
+    sont importées au chargement du module, dans le thread principal. Les
+    importer paresseusement dans ce handler — qui s'exécute dans un thread du
+    pool FastAPI — provoquait un conflit OpenMP fatal entre les copies de
+    libomp embarquées par faiss et par torch, et le serveur s'arrêtait.
+    """
+    depart = time.perf_counter()
+    try:
+        evenements = fetch_events()
+        save_raw_events(evenements, params=open_agenda.DERNIER_PERIMETRE)
+        documents = clean_events(evenements)
+        chunks = chunk_documents(documents)
+        if not chunks:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="La collecte n'a produit aucun document : élargissez le périmètre.",
+            )
+
+        PROCESSED_DATA_DIR.mkdir(parents=True, exist_ok=True)
+        (PROCESSED_DATA_DIR / "documents.json").write_text(
+            json.dumps(documents, ensure_ascii=False, indent=2), encoding="utf-8")
+        (PROCESSED_DATA_DIR / "chunks.json").write_text(
+            json.dumps(chunks, ensure_ascii=False, indent=2), encoding="utf-8")
+
+        build_index(chunks)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Échec de la reconstruction de l'index")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="La reconstruction a échoué. Consultez les journaux du serveur.",
+        ) from exc
+
+    reset_cache()
+    return RebuildResponse(
+        status="ok",
+        events_collected=len(evenements),
+        documents_indexed=len(documents),
+        chunks_indexed=len(chunks),
+        duration_seconds=round(time.perf_counter() - depart, 1),
+    )

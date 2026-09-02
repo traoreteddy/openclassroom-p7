@@ -71,6 +71,11 @@ class Settings(BaseSettings):
     # Génération
     llm_model: str = "mistral-small-latest"
 
+    # API
+    # Jeton protégeant /rebuild. Vide = endpoint ouvert (mode POC local) ;
+    # renseigné = en-tête X-API-Key obligatoire.
+    rebuild_token: str = ""
+
     # Observabilité (LangSmith)
     langsmith_tracing: bool = False
     langsmith_api_key: str = ""

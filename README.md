@@ -59,7 +59,9 @@ P7/
 │   └── results/                #   Rapports générés (non versionnés)
 ├── tests/                      # Tests automatisés (pytest)
 │   ├── test_environment.py     #   Vérification de l'environnement et des imports
-│   └── test_api.py             #   Tests de l'API
+│   ├── test_ingestion.py       #   Collecte, nettoyage, chunking
+│   ├── test_vectorstore.py     #   Embeddings et index FAISS
+│   └── api_test.py             #   Tests fonctionnels de l'API REST
 └── docs/                       # Rapport technique et documentation
     ├── architecture.md         #   Architecture technique détaillée
     ├── api-source.md           #   Caractéristiques de l'API de collecte
@@ -171,14 +173,41 @@ L'API est disponible sur http://127.0.0.1:8000 (documentation interactive : http
 ```bash
 curl -X POST http://127.0.0.1:8000/ask \
   -H "Content-Type: application/json" \
-  -d '{"question": "Quels concerts ont lieu ce week-end à Paris ?"}'
+  -d '{"question": "Quels concerts de jazz puis-je voir à Paris ?"}'
 ```
 
-Reconstruire l'index (après mise à jour des données) :
+Réponse :
+
+```json
+{
+  "answer": "**Django Lovers** — 1er octobre 2026 à 17h30, JASS CLUB (Paris). Un trio revisite…",
+  "sources": [
+    {"titre": "Django Lovers", "periode": "le 1 octobre 2026 à 17h30",
+     "lieu": "JASS CLUB", "ville": "Paris",
+     "url": "https://openagenda.com/jassclub-paris/events/django-lovers", "score": 0.422}
+  ],
+  "events_found": 5
+}
+```
+
+Chaque réponse est accompagnée des événements réellement utilisés pour la rédiger, avec
+leur page Open Agenda : l'utilisateur peut vérifier chaque événement cité.
+
+Reconstruire l'index à la demande (collecte, nettoyage, vectorisation, indexation) :
 
 ```bash
 curl -X POST http://127.0.0.1:8000/rebuild
+# {"status":"ok","events_collected":1005,"documents_indexed":896,
+#  "chunks_indexed":2842,"duration_seconds":51.4}
 ```
+
+L'endpoint se protège dès que `REBUILD_TOKEN` est configuré :
+
+```bash
+curl -X POST http://127.0.0.1:8000/rebuild -H "X-API-Key: votre-jeton"
+```
+
+**Documentation interactive** : http://127.0.0.1:8000/docs (Swagger, générée par FastAPI).
 
 ### 9. Vérifier l'environnement
 
