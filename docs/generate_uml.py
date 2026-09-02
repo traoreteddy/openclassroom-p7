@@ -245,10 +245,11 @@ def diagramme_composants() -> plt.Figure:
     interface_fournie(ax, 2.58, 5.84, "IEvenements", "droite", DATA)
     interface_requise(ax, 3.40, 5.84, "gauche", DATA)
     interface_fournie(ax, 2.58, 4.67, "IModeles", "droite", DATA)
-    # Coupes légèrement rapprochées du composant : le tronc de IModeles descend
-    # à l'aplomb de la bille et ne doit pas les traverser.
-    interface_requise(ax, 3.40, 4.08, "gauche", DATA, longueur=0.20)
-    interface_requise(ax, 3.40, 2.35, "gauche", DATA, longueur=0.20)
+    # Même longueur que la coupe de IEvenements : les trois coupes s'alignent
+    # ainsi sur la même abscisse, et aucune ne chevauche la bordure de son
+    # paquet — ce que faisaient les deux coupes rapprochées.
+    interface_requise(ax, 3.40, 4.08, "gauche", DATA)
+    interface_requise(ax, 3.40, 2.35, "gauche", DATA)
     interface_fournie(ax, 10.50, 5.37, "IRecherche", "droite", ACCENT)
     interface_fournie(ax, 10.30, 2.34, "IReponse", "droite", ACCENT)
 
@@ -278,10 +279,9 @@ def diagramme_composants() -> plt.Figure:
     # rejoint l'ouverture de sa coupe.
     ax.plot([2.955, 2.955], [4.67, 2.35], color=DATA, linewidth=1.1,
             solid_capstyle="round", zorder=1)
-    # La dérivation rejoint l'ouverture de la coupe, à l'aplomb de son centre :
-    # s'arrêter à son bord extérieur laissait un jeu visible.
-    ax.plot([2.955, 3.15], [4.08, 4.08], color=DATA, linewidth=1.1, zorder=1)
-    ax.plot([2.955, 3.15], [2.35, 2.35], color=DATA, linewidth=1.1, zorder=1)
+    # La dérivation rejoint l'ouverture de la coupe, à l'aplomb de son centre.
+    ax.plot([2.955, 3.025], [4.08, 4.08], color=DATA, linewidth=1.1, zorder=1)
+    ax.plot([2.955, 3.025], [2.35, 2.35], color=DATA, linewidth=1.1, zorder=1)
     ax.add_patch(Circle((2.955, 4.08), 0.035, facecolor=DATA, edgecolor="none", zorder=3))
 
     # ---- légende ----
