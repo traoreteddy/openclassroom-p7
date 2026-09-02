@@ -10,11 +10,13 @@ Usage :
 
 from __future__ import annotations
 
+import random
 from pathlib import Path
 
 from pptx import Presentation
 from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
+from pptx.oxml.ns import qn
 from pptx.util import Emu, Inches, Pt
 
 SORTIE = Path(__file__).resolve().parent / "soutenance-puls-events-rag.pptx"
@@ -27,6 +29,7 @@ PAPIER = RGBColor(0xF5, 0xF7, 0xF9)
 BLANC = RGBColor(0xFF, 0xFF, 0xFF)
 ACCENT = RGBColor(0xB8, 0x42, 0x0F)
 DATA = RGBColor(0x26, 0x63, 0x6F)
+DATA_CLAIR = RGBColor(0x6F, 0xBE, 0xCC)
 REGLE = RGBColor(0xDD, 0xE3, 0xEA)
 
 TITRE_POLICE = "Georgia"
@@ -68,6 +71,102 @@ def rectangle(slide, x, y, w, h, remplissage, bordure=None):
         forme.line.fill.background()
     forme.shadow.inherit = False
     return forme
+
+
+def _transparence(forme, pourcentage: int) -> None:
+    """Applique une transparence au remplissage (python-pptx ne l'expose pas)."""
+    from lxml import etree
+
+    remplissage = forme.fill._xPr.find(qn("a:solidFill"))
+    if remplissage is None:
+        return
+    alpha = etree.SubElement(remplissage[0], qn("a:alpha"))
+    alpha.set("val", str(int((100 - pourcentage) * 1000)))
+
+
+def point(slide, cx, cy, rayon, couleur, transparence=0):
+    """Un point de l'espace vectoriel, positionné par son centre."""
+    from pptx.enum.shapes import MSO_SHAPE
+
+    forme = slide.shapes.add_shape(MSO_SHAPE.OVAL, int(cx - rayon), int(cy - rayon),
+                                   int(rayon * 2), int(rayon * 2))
+    forme.fill.solid()
+    forme.fill.fore_color.rgb = couleur
+    if transparence:
+        _transparence(forme, transparence)
+    forme.line.fill.background()
+    forme.shadow.inherit = False
+    return forme
+
+
+def trait(slide, x1, y1, x2, y2, couleur, epaisseur=0.75, transparence=0):
+    """Lien entre la requête et un voisin retenu."""
+    from pptx.enum.shapes import MSO_CONNECTOR
+
+    ligne = slide.shapes.add_connector(MSO_CONNECTOR.STRAIGHT,
+                                       int(x1), int(y1), int(x2), int(y2))
+    ligne.line.color.rgb = couleur
+    ligne.line.width = Pt(epaisseur)
+    if transparence:
+        from lxml import etree
+
+        remplissage = ligne.line._get_or_add_ln().find(qn("a:solidFill"))
+        if remplissage is not None:
+            alpha = etree.SubElement(remplissage[0], qn("a:alpha"))
+            alpha.set("val", str(int((100 - transparence) * 1000)))
+    return ligne
+
+
+def motif_espace_vectoriel(slide):
+    """Constellation d'événements et cinq plus proches voisins d'une requête.
+
+    Le motif figure ce que fait réellement le système : chaque point est un
+    événement projeté dans l'espace des embeddings, la question est le point
+    orange, et les traits relient les cinq événements que la recherche retient.
+    Graine fixée pour que le rendu soit identique à chaque génération.
+    """
+    alea = random.Random(20260902)
+    x0, x1 = Inches(7.15), Inches(12.85)
+    y0, y1 = Inches(0.7), Inches(6.15)   # s'arrête au-dessus de la légende
+    requete = (Inches(10.15), Inches(3.55))
+
+    # Nuage de fond : événements du catalogue, densité décroissante vers les bords.
+    points = []
+    for _ in range(150):
+        cx = alea.uniform(x0, x1)
+        cy = alea.uniform(y0, y1)
+        dx = (cx - requete[0]) / Inches(1)
+        dy = (cy - requete[1]) / Inches(1)
+        distance = (dx * dx + dy * dy) ** 0.5
+        points.append((cx, cy, distance))
+
+    voisins = sorted(points, key=lambda p: p[2])[:5]
+    ensemble_voisins = {(p[0], p[1]) for p in voisins}
+
+    for cx, cy, distance in points:
+        if (cx, cy) in ensemble_voisins:
+            continue
+        # Plus un événement est loin de la requête, plus il s'efface.
+        transparence = min(88, 32 + int(distance * 13))
+        rayon = Emu(int(Inches(0.048) * max(0.45, 1.25 - distance * 0.11)))
+        point(slide, cx, cy, rayon, RGBColor(0x8B, 0x95, 0xA3), transparence)
+
+    for cx, cy, _ in voisins:
+        trait(slide, requete[0], requete[1], cx, cy, ACCENT, 0.75, 55)
+    for cx, cy, _ in voisins:
+        point(slide, cx, cy, Inches(0.062), DATA_CLAIR, 12)
+
+    # Halo puis cœur de la requête.
+    point(slide, requete[0], requete[1], Inches(0.36), ACCENT, 88)
+    point(slide, requete[0], requete[1], Inches(0.21), ACCENT, 62)
+    point(slide, requete[0], requete[1], Inches(0.088), ACCENT)
+
+
+def numeroter(slide, numero: int, total: int) -> None:
+    """Pagination discrète, en bas à droite."""
+    bloc(slide, L - Inches(1.55), H - Inches(0.36), Inches(0.7), Inches(0.26),
+         f"{numero:02d} / {total}", taille=9.5, couleur=GRIS,
+         police=CORPS_POLICE, align=PP_ALIGN.RIGHT)
 
 
 def page(prs, titre: str, surtitre: str = "") -> object:
@@ -175,18 +274,25 @@ def construire() -> Presentation:
     # ---------- 1. Couverture ----------
     s = prs.slides.add_slide(prs.slide_layouts[6])
     rectangle(s, 0, 0, L, H, ENCRE)
-    rectangle(s, 0, Inches(3.42), L, Inches(0.03), ACCENT)
-    bloc(s, MARGE, Inches(2.1), Inches(11), Inches(0.4),
-         "PREUVE DE CONCEPT · OPENCLASSROOMS P7", taille=13, gras=True, couleur=ACCENT)
-    bloc(s, MARGE, Inches(2.55), Inches(11.2), Inches(1.1),
-         "Assistant de recommandation\nd'événements culturels", taille=40,
-         couleur=BLANC, police=TITRE_POLICE, interligne=1.05)
-    bloc(s, MARGE, Inches(3.75), Inches(10), Inches(0.9),
+    motif_espace_vectoriel(s)
+
+    colonne = Inches(6.0)   # le texte s'arrête avant le motif
+    bloc(s, MARGE, Inches(2.05), colonne, Inches(0.35),
+         "PREUVE DE CONCEPT · OPENCLASSROOMS P7", taille=12, gras=True, couleur=ACCENT)
+    bloc(s, MARGE, Inches(2.5), colonne, Inches(1.72),
+         "Assistant\nde recommandation\nd'événements culturels", taille=33,
+         couleur=BLANC, police=TITRE_POLICE, interligne=1.12)
+    rectangle(s, MARGE, Inches(4.42), Inches(1.15), Inches(0.035), ACCENT)
+    bloc(s, MARGE, Inches(4.72), colonne, Inches(1.0),
          "Un système RAG qui répond à partir du catalogue Open Agenda,\n"
          "cite ses sources, et refuse d'inventer quand il ne sait pas.",
-         taille=17, couleur=RGBColor(0xC3, 0xCB, 0xD6))
-    bloc(s, MARGE, Inches(6.3), Inches(10), Inches(0.4),
-         "Puls-Events · Septembre 2026", taille=13, couleur=GRIS)
+         taille=14.5, couleur=RGBColor(0xC3, 0xCB, 0xD6), interligne=1.35)
+    bloc(s, MARGE, Inches(6.42), colonne, Inches(0.35),
+         "Puls-Events · Septembre 2026", taille=12, couleur=GRIS)
+    bloc(s, Inches(7.15), Inches(6.42), Inches(5.7), Inches(0.35),
+         "Espace des embeddings : 2 842 événements, "
+         "et les 5 retenus pour une question.",
+         taille=9.5, couleur=GRIS, align=PP_ALIGN.RIGHT)
 
     # ---------- 2. Le besoin métier ----------
     s = page(prs, "Pourquoi un modèle de langage seul ne suffit pas", "Le problème")
@@ -220,7 +326,7 @@ def construire() -> Presentation:
              titre, taille=18, gras=True, couleur=ENCRE, police=TITRE_POLICE)
         bloc(s, x + Inches(0.25), Inches(4.95), largeur - Inches(0.5), Inches(0.7),
              sous, taille=12.5, couleur=GRIS)
-    note(s, Inches(6.0), "Conséquence directe",
+    note(s, Inches(5.92), "Conséquence directe",
          "Mettre le catalogue à jour prend une minute. Aucun réentraînement, jamais.")
 
     # ---------- 4. Architecture ----------
@@ -338,7 +444,7 @@ def construire() -> Presentation:
              question, taille=17, gras=True, couleur=ENCRE, police=TITRE_POLICE)
         bloc(s, MARGE + Inches(0.3), y + Inches(0.62), Inches(11), Inches(0.5),
              attendu, taille=13.5, couleur=ENCRE_DOUCE)
-    bloc(s, MARGE, Inches(6.85), Inches(11.6), Inches(0.4),
+    bloc(s, MARGE, Inches(6.72), Inches(11.6), Inches(0.35),
          "Index et conteneur en local. Seul l'appel de génération passe par le réseau — "
          "captures de secours prévues.", taille=12.5, couleur=GRIS)
 
@@ -463,6 +569,12 @@ def construire() -> Presentation:
          "l'identique.\nLa vectorisation n'est lancée que si les 22 contrôles passent — inutile de "
          "payer des appels d'API sur un corpus incohérent.",
          taille=13.5, couleur=GRIS, interligne=1.4)
+
+    # La couverture reste sans numéro, comme une page de garde.
+    total = len(prs.slides._sldIdLst)
+    for i, diapo in enumerate(prs.slides, start=1):
+        if i > 1:
+            numeroter(diapo, i, total)
 
     return prs
 
