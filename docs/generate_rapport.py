@@ -24,6 +24,9 @@ from docx.shared import Cm, Pt, RGBColor
 
 SORTIE = Path(__file__).resolve().parent / "rapport-technique-puls-events-rag.docx"
 
+# Motifs de comptage, hors f-string : Python 3.11 y refuse les échappements.
+MOTIF_CONTROLE = r"r\.check\("
+
 ENCRE = RGBColor(0x1B, 0x24, 0x30)
 ENCRE_DOUCE = RGBColor(0x3C, 0x47, 0x57)
 GRIS = RGBColor(0x5B, 0x66, 0x75)
@@ -39,21 +42,53 @@ MONO = "Consolas"
 # Fabriques de contenu
 # --------------------------------------------------------------------------- #
 
-def compter_commits() -> int:
-    """Nombre de commits, lu depuis git.
-
-    Le chiffre était écrit en dur et s'est retrouvé faux dès le commit suivant :
-    il est désormais relu à chaque génération.
-    """
+def _sortie_commande(commande: list[str]) -> str:
+    """Exécute une commande à la racine du dépôt et retourne sa sortie."""
     import subprocess
 
     try:
-        sortie = subprocess.run(["git", "rev-list", "--count", "HEAD"],
-                                capture_output=True, text=True, check=True,
-                                cwd=Path(__file__).resolve().parent)
-        return int(sortie.stdout.strip())
-    except (subprocess.CalledProcessError, ValueError, FileNotFoundError):
+        resultat = subprocess.run(commande, capture_output=True, text=True, check=False,
+                                  cwd=Path(__file__).resolve().parents[1])
+        return resultat.stdout
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def compter_commits() -> int:
+    """Nombre de commits, lu depuis git.
+
+    Les chiffres de cette page étaient écrits en dur et se sont retrouvés faux
+    dès le commit suivant. Ils sont désormais relus à chaque génération.
+    """
+    sortie = _sortie_commande(["git", "rev-list", "--count", "HEAD"]).strip()
+    return int(sortie) if sortie.isdigit() else 0
+
+
+def compter_tests() -> int:
+    """Nombre de tests collectés par pytest."""
+    import re
+
+    sortie = _sortie_commande(["uv", "run", "pytest", "--collect-only", "-q"])
+    trouve = re.search(r"(\d+) tests? collected", sortie)
+    return int(trouve.group(1)) if trouve else 0
+
+
+def compter_modules() -> int:
+    """Nombre de modules Python suivis par git."""
+    sortie = _sortie_commande(["git", "ls-files", "*.py"])
+    return len([ligne for ligne in sortie.splitlines() if ligne.strip()])
+
+
+def compter_occurrences(fichier: str, motif: str) -> int:
+    """Occurrences d'un motif dans un fichier du dépôt."""
+    import re
+
+    chemin = Path(__file__).resolve().parents[1] / fichier
+    if not chemin.exists():
         return 0
+    # MULTILINE : sans lui, « ^ » ne vaut qu'au tout début du fichier et le
+    # comptage renvoie zéro sans que rien ne le signale.
+    return len(re.findall(motif, chemin.read_text(encoding="utf-8"), re.MULTILINE))
 
 
 def _fond(element, couleur_hex: str) -> None:
@@ -297,7 +332,8 @@ def construire() -> Document:
         ["Objet", "Rapport technique"],
         ["Date", "Septembre 2026"],
         ["Dépôt", "github.com/traoreteddy/openclassroom-p7"],
-        ["Volumétrie", f"{compter_commits()} commits · 28 modules Python · 86 tests"],
+        ["Volumétrie", (f"{compter_commits()} commits · {compter_modules()} "
+                        f"modules Python · {compter_tests()} tests")],
     ])
     doc.add_page_break()
 
@@ -701,6 +737,7 @@ def construire() -> Document:
     titre(doc, "Tests effectués", 2)
     tableau(doc, ["Fichier", "Portée", "Nombre"], [
         ["tests/api_test.py", "Contrat HTTP : validation, codes, sécurité, Swagger", "19 + 1 ignoré"],
+        ["tests/test_ui.py", "Interface Streamlit : URL, erreurs, scénarios", "8"],
         ["tests/test_ingestion.py", "Collecte, filtres, nettoyage, chunking", "20"],
         ["tests/test_vectorstore.py", "Embeddings, index, exhaustivité, algorithmes", "13"],
         ["tests/test_evaluation.py", "Métriques, validation des sorties, robustesse", "20"],
@@ -849,8 +886,10 @@ def construire() -> Document:
     puce(doc, "**La reproductibilité.** Trois commandes depuis un clone vierge ; le "
               "prétraitement est déterministe — rejouer un fichier brut reproduit les chunks "
               "à l'identique.")
-    puce(doc, "**Le contrôle qualité.** 22 contrôles de cohérence avant vectorisation, 86 "
-              "tests, bancs d'évaluation et de robustesse reproductibles.")
+    controles = compter_occurrences("scripts/check_dataset.py", MOTIF_CONTROLE)
+    puce(doc, f"**Le contrôle qualité.** {controles} contrôles de cohérence avant "
+              f"vectorisation, {compter_tests()} tests, bancs d'évaluation et de "
+              "robustesse reproductibles.")
 
     titre(doc, "Limites du POC", 2)
     tableau(doc, ["Dimension", "Limite constatée"], [
@@ -896,7 +935,8 @@ def construire() -> Document:
 
     # ═══════════════════ 9 ═══════════════════
     titre(doc, "Organisation du dépôt GitHub", 1, "9")
-    para(doc, f"github.com/traoreteddy/openclassroom-p7 — {compter_commits()} commits, une branche par étape, "
+    para(doc, f"github.com/traoreteddy/openclassroom-p7 — {compter_commits()} commits, "
+              "une branche par étape, "
               "fusionnées par des commits de merge explicites.")
     code(doc,
          "P7/\n"

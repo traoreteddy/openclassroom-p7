@@ -16,6 +16,7 @@ Question ──► recherche sémantique (FAISS) ──► 5 événements ──
 | **Rapport technique** — version consultable en ligne | [claude.ai/code/artifact/e8e1dd5d](https://claude.ai/code/artifact/e8e1dd5d-cbda-46af-9399-d069a4c3a7de) |
 | **Support de soutenance** — 14 diapositives | [`docs/soutenance-puls-events-rag.pptx`](docs/soutenance-puls-events-rag.pptx) |
 | **Schémas UML** — composants et séquence | [`docs/uml-composants.png`](docs/uml-composants.png) · [`docs/uml-sequence.png`](docs/uml-sequence.png) |
+| Régénérer les documents (chiffres relus depuis le dépôt) | `uv run --with python-pptx --with pillow python docs/generate_presentation.py` |
 | Générateurs des trois documents | [`generate_rapport.py`](docs/generate_rapport.py) · [`generate_presentation.py`](docs/generate_presentation.py) · [`generate_uml.py`](docs/generate_uml.py) |
 
 ## ⚡ Démarrage en trois commandes
