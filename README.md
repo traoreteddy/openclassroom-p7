@@ -14,7 +14,8 @@ Question ──► recherche sémantique (FAISS) ──► 5 événements ──
 |---|---|
 | **Rapport technique** — Word, 10 sections du template imposé | [`docs/rapport-technique-puls-events-rag.docx`](docs/rapport-technique-puls-events-rag.docx) |
 | **Rapport technique** — version consultable en ligne | [claude.ai/code/artifact/e8e1dd5d](https://claude.ai/code/artifact/e8e1dd5d-cbda-46af-9399-d069a4c3a7de) |
-| **Support de soutenance** — 14 diapositives | [`docs/soutenance-puls-events-rag.pptx`](docs/soutenance-puls-events-rag.pptx) |
+| **Fiche d'orateur** — 15 min, 4 parties, questions du jury | [`docs/discours.pdf`](docs/discours.pdf) |
+| **Support de soutenance** — 15 diapositives | [`docs/soutenance-puls-events-rag.pptx`](docs/soutenance-puls-events-rag.pptx) |
 | **Schémas UML** — composants et séquence | [`docs/uml-composants.png`](docs/uml-composants.png) · [`docs/uml-sequence.png`](docs/uml-sequence.png) |
 | Régénérer les documents (chiffres relus depuis le dépôt) | `uv run --with python-pptx --with pillow python docs/generate_presentation.py` |
 | Générateurs des trois documents | [`generate_rapport.py`](docs/generate_rapport.py) · [`generate_presentation.py`](docs/generate_presentation.py) · [`generate_uml.py`](docs/generate_uml.py) |
@@ -116,6 +117,8 @@ P7/
     ├── soutenance-…​.pptx       #   Support de soutenance (14 diapositives)
     ├── uml-composants.png/.svg #   Diagramme de composants UML
     ├── uml-sequence.png/.svg   #   Diagramme de séquence UML
+    ├── discours.pdf            #   Fiche d'orateur pour la soutenance
+    ├── generate_discours.py    #   Générateur de la fiche d'orateur
     ├── generate_rapport.py     #   Générateur du rapport Word
     ├── generate_presentation.py#   Générateur du support de soutenance
     ├── generate_uml.py         #   Générateur des schémas UML
