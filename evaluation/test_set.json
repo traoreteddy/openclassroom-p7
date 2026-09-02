@@ -1,0 +1,89 @@
+[
+  {
+    "id": "jazz-01",
+    "question": "Quels concerts de jazz puis-je voir à Paris ?",
+    "reference": "Le catalogue propose de nombreux concerts de jazz au JASS CLUB, 141 rue de Tolbiac à Paris : Django Lovers le 1er octobre 2026 à 17h30, MEGAFAUNE « Let the parade begin! » le 30 septembre 2026 à 17h30, et Le Grand Soir / Spécial Michel Legrand le 3 septembre 2026 à 17h30. Des jam sessions y sont également organisées régulièrement.",
+    "categorie": "recommandation simple",
+    "verite_terrain": "35 événements du catalogue mentionnent le jazz, dont 32 au JASS CLUB",
+    "annotation": "La réponse doit citer des concerts de jazz réellement indexés, avec leur date et leur lieu.",
+    "critere_lexical": "\\bjazz\\b"
+  },
+  {
+    "id": "photo-01",
+    "question": "Je cherche une exposition de photographie à Paris",
+    "reference": "Plusieurs expositions photographiques sont programmées à Paris : « La photographie en toutes lettres » à la Maison Européenne de la Photographie du 2 au 13 septembre 2026, « Les métiers d'art dans les photographies de François Kollar » au Jardin Monica Vitti à partir du 4 septembre 2026, et l'exposition de Justine Kurland et Mariah Robertson à la Galerie Miranda du 4 septembre au 14 novembre 2026.",
+    "categorie": "recommandation simple",
+    "verite_terrain": "Plusieurs dizaines d'expositions photographiques, en galeries et institutions parisiennes",
+    "annotation": "Les expositions citées doivent être des expositions photographiques du catalogue, avec leurs dates.",
+    "critere_lexical": "photograph"
+  },
+  {
+    "id": "enfants-01",
+    "question": "Que faire avec des enfants à Paris ?",
+    "reference": "Le catalogue propose des activités destinées aux familles : les « Dimanches au Vert en famille » au Parc Montsouris pour les enfants de 3 à 10 ans, la visite en famille « Il était une fois » à l'Arc de triomphe, et la Cité des enfants 5-10 ans à la Cité des sciences et de l'industrie.",
+    "categorie": "recommandation avec public cible",
+    "verite_terrain": "Événements dont le titre mentionne enfants, famille ou jeune public",
+    "annotation": "La réponse doit proposer des activités adaptées aux enfants et présentes dans le catalogue.",
+    "critere_lexical": "enfant|famille|jeune public"
+  },
+  {
+    "id": "danse-01",
+    "question": "Y a-t-il des spectacles de danse contemporaine ?",
+    "reference": "Plusieurs spectacles de danse contemporaine sont programmés : « Sphere / Kurah » de Bouchra Ouizguen à la Ménagerie de verre le 29 septembre 2026, « Nahl » de Bouchra Ouizguen au Panthéon le 30 septembre 2026 dans le cadre du Festival d'Automne, « Antigone » d'Alan Lucien Øyen au Théâtre de la Ville du 1er au 7 octobre 2026, et « SāHO » au Théâtre de la Bastille du 5 au 7 octobre 2026.",
+    "categorie": "recommandation par discipline",
+    "verite_terrain": "9 événements relèvent de la danse contemporaine ou de la chorégraphie",
+    "annotation": "La réponse doit citer des spectacles vivants de danse, pas des expositions sur ce thème.",
+    "critere_lexical": "danse|chorégraph|ballet"
+  },
+  {
+    "id": "science-01",
+    "question": "Quelles conférences scientifiques sont programmées ?",
+    "reference": "Le Grand Palais propose « Les conférences insolites » du 28 octobre 2026 au 27 janvier 2027. Le Muséum national d'Histoire naturelle organise la conférence « La fabrique des images : la photographie » le 8 octobre 2026 à 17h00. La Cité des sciences et de l'industrie propose également un cycle de conférences.",
+    "categorie": "recommandation thématique",
+    "verite_terrain": "Événements dont le titre contient « conférence »",
+    "annotation": "La réponse doit citer des conférences réellement programmées, avec leurs dates.",
+    "critere_lexical": "conférence|rencontre|débat"
+  },
+  {
+    "id": "gratuit-01",
+    "question": "Quels événements gratuits ou à prix libre puis-je voir ?",
+    "reference": "Le JASS CLUB organise « Échecs & Jam ! » à entrée à prix libre, notamment les 27 septembre, 4 octobre et 18 octobre 2026 à 15h00. La Cité des sciences et de l'industrie propose « Zoom : si c'est gratuit c'est vous le produit ! » du 25 avril au 26 septembre 2026.",
+    "categorie": "recommandation avec contrainte tarifaire",
+    "verite_terrain": "Événements dont le titre mentionne gratuit, prix libre ou entrée libre",
+    "annotation": "La gratuité ne doit être affirmée que si elle figure dans le contexte.",
+    "critere_lexical": "gratuit|prix libre|entrée libre"
+  },
+  {
+    "id": "hors-perimetre-ville",
+    "question": "Y a-t-il des concerts à Marseille ?",
+    "reference": "Le catalogue ne contient aucun événement à Marseille : il ne couvre que Paris. Le système doit le signaler explicitement, et peut proposer des concerts parisiens en précisant qu'ils ne correspondent pas à la ville demandée.",
+    "categorie": "hors périmètre géographique",
+    "verite_terrain": "La seule ville présente dans le catalogue est Paris",
+    "annotation": "Critère principal : ne pas inventer d'événement marseillais."
+  },
+  {
+    "id": "hors-perimetre-sujet",
+    "question": "Quelle est la capitale du Pérou ?",
+    "reference": "Cette question ne porte pas sur un événement culturel et ne trouve pas de réponse dans le catalogue. Le système doit indiquer qu'aucun événement ne correspond, sans répondre à la question de géographie depuis ses connaissances générales.",
+    "categorie": "hors domaine",
+    "verite_terrain": "Aucun événement du catalogue ne traite de la géographie du Pérou",
+    "annotation": "Critère principal : ne pas répondre « Lima »."
+  },
+  {
+    "id": "lieu-01",
+    "question": "Que se passe-t-il au JASS CLUB ?",
+    "reference": "Le JASS CLUB, 141 rue de Tolbiac à Paris, programme des concerts de jazz et des jam sessions : Django Lovers le 1er octobre 2026, MEGAFAUNE « Let the parade begin! » le 30 septembre 2026, « Armed With Love » du Lucy Khanyan Trio le 2 septembre 2026, et des soirées « Échecs & Jam ! » à prix libre.",
+    "categorie": "recherche par lieu",
+    "verite_terrain": "32 événements se déroulent au JASS CLUB",
+    "annotation": "Les événements cités doivent tous avoir lieu au JASS CLUB, avec les bonnes dates.",
+    "critere_lexical": "JASS CLUB"
+  },
+  {
+    "id": "accessibilite-01",
+    "question": "Y a-t-il des événements accessibles aux personnes à mobilité réduite ?",
+    "reference": "Certains événements du catalogue précisent une accessibilité handicap moteur, notamment à la Cité des sciences et de l'industrie et aux Étincelles du Palais de la découverte. Le système doit s'appuyer sur l'information d'accessibilité présente dans le contexte et signaler lorsqu'elle n'est pas renseignée.",
+    "categorie": "recommandation avec contrainte d'accessibilité",
+    "verite_terrain": "Le champ accessibilité n'est renseigné que sur une partie des événements",
+    "annotation": "L'accessibilité ne doit être affirmée que si elle figure dans les métadonnées."
+  }
+]
