@@ -39,6 +39,23 @@ MONO = "Consolas"
 # Fabriques de contenu
 # --------------------------------------------------------------------------- #
 
+def compter_commits() -> int:
+    """Nombre de commits, lu depuis git.
+
+    Le chiffre était écrit en dur et s'est retrouvé faux dès le commit suivant :
+    il est désormais relu à chaque génération.
+    """
+    import subprocess
+
+    try:
+        sortie = subprocess.run(["git", "rev-list", "--count", "HEAD"],
+                                capture_output=True, text=True, check=True,
+                                cwd=Path(__file__).resolve().parent)
+        return int(sortie.stdout.strip())
+    except (subprocess.CalledProcessError, ValueError, FileNotFoundError):
+        return 0
+
+
 def _fond(element, couleur_hex: str) -> None:
     """Applique une couleur de fond à un paragraphe ou une cellule."""
     ombrage = OxmlElement("w:shd")
@@ -280,7 +297,7 @@ def construire() -> Document:
         ["Objet", "Rapport technique"],
         ["Date", "Septembre 2026"],
         ["Dépôt", "github.com/traoreteddy/openclassroom-p7"],
-        ["Volumétrie", "19 commits · 28 modules Python · 86 tests"],
+        ["Volumétrie", f"{compter_commits()} commits · 28 modules Python · 86 tests"],
     ])
     doc.add_page_break()
 
@@ -462,7 +479,9 @@ def construire() -> Document:
     tableau(doc, ["Anomalie", "Exemple réel", "Traitement"], [
         ["HTML dans les descriptions", "<p>Le FIAP Paris est un Centre…</p>", "Suppression des balises et entités"],
         ["Contenu de test", "<p>lorem</p>", "Seuil de longueur minimale"],
-        ["Titre en Unicode stylisé", "𝑮𝒆́𝒐𝒍𝒐𝒈𝒊𝒆𝒔 𝒅𝒆 𝒍'𝒂𝒃𝒔𝒆𝒏𝒄𝒆", "Normalisation NFKC"],
+        ["Titre en Unicode stylisé",
+         "« Géologies de l'absence » en caractères mathématiques Unicode",
+         "Normalisation NFKC"],
         ["Date de saisie aberrante", "Un événement daté du 26 mars 2503", "Rejet hors [1970, année+5]"],
         ["Liste sérialisée en texte", "\"['jazz', 'concert']\"", "Analyse littérale en vraie liste"],
         ["Champ multilingue brut", '{"id":1,"label":{"fr":"Sur place"}}', "Extraction du libellé français"],
@@ -877,7 +896,7 @@ def construire() -> Document:
 
     # ═══════════════════ 9 ═══════════════════
     titre(doc, "Organisation du dépôt GitHub", 1, "9")
-    para(doc, "github.com/traoreteddy/openclassroom-p7 — 19 commits, une branche par étape, "
+    para(doc, f"github.com/traoreteddy/openclassroom-p7 — {compter_commits()} commits, une branche par étape, "
               "fusionnées par des commits de merge explicites.")
     code(doc,
          "P7/\n"
