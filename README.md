@@ -12,9 +12,10 @@ Question ──► recherche sémantique (FAISS) ──► 5 événements ──
 
 | Livrable | Où |
 |---|---|
-| **Rapport technique** (site, 10 sections du template imposé) | [claude.ai/code/artifact/e8e1dd5d](https://claude.ai/code/artifact/e8e1dd5d-cbda-46af-9399-d069a4c3a7de) |
-| **Support de soutenance** (14 diapositives) | [`docs/soutenance-puls-events-rag.pptx`](docs/soutenance-puls-events-rag.pptx) |
-| Générateur du support | [`docs/generate_presentation.py`](docs/generate_presentation.py) |
+| **Rapport technique** — Word, 10 sections du template imposé | [`docs/rapport-technique-puls-events-rag.docx`](docs/rapport-technique-puls-events-rag.docx) |
+| **Rapport technique** — version consultable en ligne | [claude.ai/code/artifact/e8e1dd5d](https://claude.ai/code/artifact/e8e1dd5d-cbda-46af-9399-d069a4c3a7de) |
+| **Support de soutenance** — 14 diapositives | [`docs/soutenance-puls-events-rag.pptx`](docs/soutenance-puls-events-rag.pptx) |
+| Générateurs des deux documents | [`docs/generate_rapport.py`](docs/generate_rapport.py) · [`docs/generate_presentation.py`](docs/generate_presentation.py) |
 
 ## ⚡ Démarrage en trois commandes
 
@@ -98,8 +99,10 @@ P7/
 │   ├── test_vectorstore.py     #   Embeddings et index FAISS
 │   └── api_test.py             #   Tests fonctionnels de l'API REST
 └── docs/                       # Rapport technique et documentation
+    ├── rapport-technique-….docx#   Rapport technique (Word, 10 sections)
     ├── soutenance-…​.pptx       #   Support de soutenance (14 diapositives)
-    ├── generate_presentation.py#   Générateur du support, chiffres issus des mesures
+    ├── generate_rapport.py     #   Générateur du rapport Word
+    ├── generate_presentation.py#   Générateur du support de soutenance
     ├── architecture.md         #   Architecture technique détaillée
     ├── api-source.md           #   Caractéristiques de l'API de collecte
     ├── index-vectoriel.md      #   Choix et mesures de l'index FAISS
