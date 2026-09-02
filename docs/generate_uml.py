@@ -140,6 +140,22 @@ def note(ax, x, y, w, h, texte, ancre=None):
                 linestyle=(0, (2, 2)), zorder=1)
 
 
+def flux(ax, xy1, xy2, etiquette=""):
+    """Flux d'objets entre deux étapes du pipeline.
+
+    Distinct de la dépendance : preprocessing n'importe pas open_agenda, c'est le
+    script d'orchestration qui les enchaîne. Une flèche « use » entre les deux
+    affirmerait un couplage qui n'existe pas.
+    """
+    ax.annotate("", xy=xy2, xytext=xy1,
+                arrowprops={"arrowstyle": "-|>", "color": DATA, "linewidth": 1.1,
+                            "shrinkA": 2, "shrinkB": 2, "mutation_scale": 11})
+    if etiquette:
+        ax.text((xy1[0] + xy2[0]) / 2 + 0.12, (xy1[1] + xy2[1]) / 2, etiquette,
+                fontsize=6.3, color=DATA, family=SANS, ha="left", va="center",
+                style="italic", zorder=6)
+
+
 def paquet(ax, x, y, w, h, nom, couleur=REGLE):
     """Paquet UML : rectangle à onglet."""
     onglet_l, onglet_h = 1.5, 0.24
@@ -223,25 +239,40 @@ def diagramme_composants() -> plt.Figure:
     interface_fournie(ax, 2.58, 5.84, "IEvenements", "droite", DATA)
     interface_requise(ax, 3.40, 5.84, "gauche", DATA)
     interface_fournie(ax, 2.58, 4.67, "IModeles", "droite", DATA)
-    interface_requise(ax, 3.40, 4.10, "gauche", DATA)
-    interface_requise(ax, 3.40, 2.16, "gauche", DATA, "IModeles")
+    interface_requise(ax, 3.40, 4.08, "gauche", DATA)
+    interface_requise(ax, 3.40, 2.35, "gauche", DATA)
     interface_fournie(ax, 10.50, 5.37, "IRecherche", "droite", ACCENT)
     interface_fournie(ax, 10.30, 2.34, "IReponse", "droite", ACCENT)
 
     # ---- dépendances ----
-    dependance(ax, (4.98, 5.45), (4.98, 5.29), "«use»")
-    dependance(ax, (4.98, 4.55), (4.98, 4.46), "")
-    dependance(ax, (6.55, 4.08), (7.35, 5.05), "vectorise")
-    dependance(ax, (8.92, 4.95), (8.92, 4.52), "«persist»")
-    dependance(ax, (7.55, 3.90), (4.98, 2.79), "charge l'index", courbure=0.16,
-               etiquette_xy=(6.35, 3.18))
+    # Flux de données du pipeline : événements bruts, puis chunks.
+    flux(ax, (4.98, 5.45), (4.98, 5.29), "événements bruts")
+    flux(ax, (4.98, 4.55), (4.98, 4.46), "chunks")
+
+    # faiss_store dépend de embeddings, et non l'inverse : c'est lui qui appelle
+    # le modèle pour vectoriser. La flèche pointait dans le mauvais sens.
+    # Point d'attache haut sur faiss_store : plus bas, cette flèche s'emmêlait
+    # avec celle de rag.chain qui arrive sur la même arête.
+    dependance(ax, (7.35, 5.62), (6.55, 4.32), "«use»", etiquette_xy=(7.02, 5.08))
+    dependance(ax, (8.92, 4.95), (8.92, 4.52), "«create»")
+
+    # rag.chain lit l'index : c'est donc lui le dépendant. La flèche partait de
+    # l'artefact, ce qui affirmait que l'index dépendait de la chaîne. Elle vise
+    # maintenant faiss_store, qui fournit IRecherche, et non l'artefact lui-même.
+    dependance(ax, (5.30, 2.79), (7.33, 4.98), "«use» IRecherche", courbure=-0.10,
+               etiquette_xy=(6.55, 3.42))
     dependance(ax, (4.98, 1.92), (4.98, 1.66), "«use»")
     dependance(ax, (8.72, 1.92), (8.72, 1.66), "«use»")
     dependance(ax, (7.15, 2.34), (6.55, 2.34), "appelle")
-    # Connecteur d'assemblage : rag.chain requiert IModeles, fournie par Mistral.
-    # Tracé orthogonal dans la colonne libre, pour ne croiser aucun composant.
-    ax.plot([2.955, 2.85, 2.85, 3.025], [4.67, 4.67, 2.16, 2.16],
+    # Connecteur d'assemblage : IModeles est fournie une fois par Mistral et
+    # requise par deux composants. Le tronc descend dans la colonne libre, avec
+    # une dérivation vers chaque socket — sans cela, le socket de embeddings
+    # restait suspendu, sans lien visible avec la sucette qui le sert.
+    ax.plot([2.955, 2.80, 2.80, 2.925], [4.67, 4.67, 4.08, 4.08],
             color=DATA, linewidth=1.1, solid_capstyle="round", zorder=1)
+    ax.plot([2.80, 2.80, 2.925], [4.08, 2.35, 2.35],
+            color=DATA, linewidth=1.1, solid_capstyle="round", zorder=1)
+    ax.add_patch(Circle((2.80, 4.08), 0.035, facecolor=DATA, edgecolor="none", zorder=3))
 
     # ---- légende ----
     y = 0.28
