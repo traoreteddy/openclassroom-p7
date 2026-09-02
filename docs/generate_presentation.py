@@ -524,39 +524,41 @@ def construire() -> Presentation:
 
     # ---------- 10. Évaluation ----------
     s = page(prs, "Ce que valent les réponses", "Résultats")
-    chiffres(s, Inches(2.05), [
+    chiffres(s, Inches(2.02), [
         ("10 / 10", "réponses jugées correctes"),
         ("0,943", "fidélité aux sources"),
         ("0,882", "similarité à la référence"),
         ("0,943", "précision thématique"),
     ])
-    bloc(s, MARGE, Inches(3.65), Inches(11.6), Inches(0.35),
-         "Jeu de test annoté : 10 questions, dont deux cas limites délibérés",
-         taille=16, gras=True, couleur=ENCRE)
-    puces(s, Inches(4.1), [
-        ("Références rédigées depuis le catalogue,", "jamais depuis les résultats du système : annoter depuis le moteur rendrait l'évaluation circulaire."),
-        ("Deux cas limites obligatoires :", "une ville absente du catalogue, une question hors domaine. Un jeu qui n'évalue que les cas favorables ne prouve rien."),
-        ("Le juge s'est trompé trois fois sur dix.", "Il comparait des listes au lieu de vérifier la validité. Prompt corrigé, verdicts relisibles par un humain."),
-    ], taille=15)
 
-    # ---------- 11. Une mesure basse expliquée ----------
-    s = page(prs, "Une mesure basse qui n'est pas un défaut", "Résultats")
-    bloc(s, MARGE, Inches(2.1), Inches(11.6), Inches(0.5),
-         "context_recall = 0,32 — la métrique compare les extraits récupérés à UNE réponse de référence.",
-         taille=17, couleur=ENCRE_DOUCE)
-    rectangle(s, MARGE, Inches(2.85), L - 2 * MARGE, Inches(2.0), BLANC, REGLE)
-    bloc(s, MARGE + Inches(0.35), Inches(3.05), Inches(11), Inches(1.7),
-         "Question       « Quels concerts de jazz à Paris ? »\n"
-         "Référence      Django Lovers, MEGAFAUNE, Le Grand Soir\n"
-         "Le système     TANA JAZZ NIGHT, Jazz à la Cité, Jam Session Groove…\n"
-         "Vérification   5 / 5 relèvent bien du jazz — 0 / 5 dans la référence\n"
-         "Le catalogue   contient 35 concerts de jazz",
-         taille=14.5, couleur=ENCRE, police="Consolas", interligne=1.5)
-    note(s, Inches(5.1), "Ce que cela apprend",
-         "Une recommandation admet des dizaines de réponses correctes. D'où une métrique ajoutée "
-         "qui vérifie une propriété — « est-ce du jazz ? » — plutôt qu'une liste : 0,943.")
+    colonne = Inches(5.55)
+    droite = MARGE + colonne + Inches(0.5)
 
-    # ---------- 12. Robustesse ----------
+    bloc(s, MARGE, Inches(3.62), colonne, Inches(0.32),
+         "Un jeu de test conçu pour pouvoir échouer", taille=15, gras=True, couleur=ENCRE)
+    puces(s, Inches(4.02), [
+        ("Références écrites depuis le catalogue,", "jamais depuis les résultats du système : sinon l'évaluation serait circulaire."),
+        ("Deux cas limites délibérés :", "une ville absente du catalogue, une question hors domaine."),
+        ("Le juge s'est trompé 3 fois sur 10.", "Il comparait des listes au lieu de vérifier la validité."),
+    ], taille=13, x=MARGE, largeur=colonne)
+
+    bloc(s, droite, Inches(3.62), colonne, Inches(0.32),
+         "context_recall = 0,32 n'est pas un défaut", taille=15, gras=True, couleur=ENCRE)
+    rectangle(s, droite, Inches(4.02), colonne, Inches(1.62), BLANC, REGLE)
+    bloc(s, droite + Inches(0.22), Inches(4.16), colonne - Inches(0.4), Inches(1.4),
+         "Référence   Django Lovers, MEGAFAUNE…\n"
+         "Le système  TANA JAZZ NIGHT, Jazz à la Cité…\n"
+         "Contrôle    5 / 5 relèvent du jazz\n"
+         "            0 / 5 dans la référence\n"
+         "Catalogue   35 concerts de jazz",
+         taille=11.5, couleur=ENCRE, police="Consolas", interligne=1.4)
+    bloc(s, droite, Inches(5.78), colonne, Inches(0.9),
+         "La métrique compare à UNE référence, or une recommandation admet des dizaines de "
+         "réponses correctes. D'où une métrique ajoutée qui vérifie une propriété — « est-ce "
+         "du jazz ? » — plutôt qu'une liste : 0,943.",
+         taille=12.5, couleur=ENCRE_DOUCE, interligne=1.3)
+
+    # ---------- 11. Robustesse ----------
     s = page(prs, "Deux vulnérabilités trouvées et corrigées", "Robustesse")
     for i, (titre, avant, apres) in enumerate([
             ("Injection directe, par la question",
@@ -580,7 +582,7 @@ def construire() -> Presentation:
          "16 scénarios adverses, tous conformes — chacun rejoué à chaque exécution du banc.",
          taille=13, couleur=GRIS)
 
-    # ---------- 13. Coût de production ----------
+    # ---------- 12. Coût de production ----------
     s = page(prs, "Ce que coûterait la production", "Économie")
     bloc(s, MARGE, Inches(2.05), Inches(11.6), Inches(0.35),
          "Volumes mesurés, non supposés : 1 804 jetons d'entrée et 196 de sortie par question",
@@ -603,7 +605,7 @@ def construire() -> Presentation:
          "reformulation contrainte — et réversibilité, le fournisseur tenant en deux fonctions.",
          taille=13, couleur=ENCRE_DOUCE, interligne=1.35)
 
-    # ---------- 14. Limites ----------
+    # ---------- 13. Limites ----------
     s = page(prs, "Ce que ce POC ne fait pas", "Limites")
     puces(s, Inches(2.15), [
         ("Paris uniquement.", "Le catalogue national compte 1,2 million d'événements ; la collecte est déjà paramétrée pour une liste de villes."),
@@ -614,7 +616,7 @@ def construire() -> Presentation:
         ("« Ce week-end » n'est pas résolu en dates.", "Le modèle s'appuie sur les périodes textuelles du contexte."),
     ], taille=15.5)
 
-    # ---------- 15. Perspectives ----------
+    # ---------- 14. Perspectives ----------
     s = page(prs, "Ce qu'il faudrait pour la production", "Perspectives")
     colonnes = [
         ("Court terme", [
@@ -646,7 +648,7 @@ def construire() -> Presentation:
             bloc(s, x + Inches(0.28), Inches(2.95 + j * 0.72), largeur - Inches(0.55),
                  Inches(0.7), "— " + item, taille=13, couleur=ENCRE_DOUCE, interligne=1.2)
 
-    # ---------- 16. Reproductibilité ----------
+    # ---------- 15. Reproductibilité ----------
     s = page(prs, "Reproductible en trois commandes", "Livraison")
     rectangle(s, MARGE, Inches(2.15), L - 2 * MARGE, Inches(1.9), ENCRE)
     bloc(s, MARGE + Inches(0.4), Inches(2.4), Inches(11), Inches(1.5),
