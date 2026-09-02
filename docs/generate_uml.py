@@ -72,9 +72,9 @@ def composant(ax, x, y, w, h, nom, sous_titre="", couleur=SURFACE,
                     color=ENCRE_DOUCE, family=SANS, va="center", zorder=5)
 
 
-def interface_fournie(ax, x, y, nom, cote="droite", couleur=DATA):
+def interface_fournie(ax, x, y, nom, cote="droite", couleur=DATA, longueur=0.30):
     """Interface fournie : la « sucette » — un trait et un cercle plein."""
-    dx = 0.30 if cote == "droite" else -0.30
+    dx = longueur if cote == "droite" else -longueur
     ax.plot([x, x + dx], [y, y], color=couleur, linewidth=1.2, zorder=3)
     ax.add_patch(Circle((x + dx * 1.25, y), 0.075, facecolor=PAPIER,
                         edgecolor=couleur, linewidth=1.2, zorder=4))
@@ -85,11 +85,17 @@ def interface_fournie(ax, x, y, nom, cote="droite", couleur=DATA):
             bbox={"facecolor": PAPIER, "edgecolor": "none", "pad": 1.0})
 
 
-def interface_requise(ax, x, y, cote="gauche", couleur=DATA, nom=""):
-    """Interface requise : le « socket » — un trait et un demi-cercle ouvert."""
-    dx = -0.30 if cote == "gauche" else 0.30
+def interface_requise(ax, x, y, cote="gauche", couleur=DATA, nom="", longueur=0.30):
+    """Interface requise : le « socket » — un trait et un demi-cercle ouvert.
+
+    La coupe doit s'ouvrir vers la sucette qui la sert, pour que l'une paraisse
+    emboîtée dans l'autre. Avec un socket sur l'arête gauche d'un composant, la
+    sucette arrive de la gauche : l'ouverture regarde donc à gauche, soit la
+    moitié droite du cercle, sans rotation.
+    """
+    dx = -longueur if cote == "gauche" else longueur
     ax.plot([x, x + dx], [y, y], color=couleur, linewidth=1.2, zorder=3)
-    angle = 90 if cote == "gauche" else 270
+    angle = 0 if cote == "gauche" else 180
     ax.add_patch(Arc((x + dx * 1.25, y), 0.2, 0.2, angle=angle,
                      theta1=-90, theta2=90, color=couleur, linewidth=1.4, zorder=4))
     if nom:
@@ -239,8 +245,10 @@ def diagramme_composants() -> plt.Figure:
     interface_fournie(ax, 2.58, 5.84, "IEvenements", "droite", DATA)
     interface_requise(ax, 3.40, 5.84, "gauche", DATA)
     interface_fournie(ax, 2.58, 4.67, "IModeles", "droite", DATA)
-    interface_requise(ax, 3.40, 4.08, "gauche", DATA)
-    interface_requise(ax, 3.40, 2.35, "gauche", DATA)
+    # Coupes légèrement rapprochées du composant : le tronc de IModeles descend
+    # à l'aplomb de la bille et ne doit pas les traverser.
+    interface_requise(ax, 3.40, 4.08, "gauche", DATA, longueur=0.20)
+    interface_requise(ax, 3.40, 2.35, "gauche", DATA, longueur=0.20)
     interface_fournie(ax, 10.50, 5.37, "IRecherche", "droite", ACCENT)
     interface_fournie(ax, 10.30, 2.34, "IReponse", "droite", ACCENT)
 
@@ -264,15 +272,17 @@ def diagramme_composants() -> plt.Figure:
     dependance(ax, (4.98, 1.92), (4.98, 1.66), "«use»")
     dependance(ax, (8.72, 1.92), (8.72, 1.66), "«use»")
     dependance(ax, (7.15, 2.34), (6.55, 2.34), "appelle")
-    # Connecteur d'assemblage : IModeles est fournie une fois par Mistral et
-    # requise par deux composants. Le tronc descend dans la colonne libre, avec
-    # une dérivation vers chaque socket — sans cela, le socket de embeddings
-    # restait suspendu, sans lien visible avec la sucette qui le sert.
-    ax.plot([2.955, 2.80, 2.80, 2.925], [4.67, 4.67, 4.08, 4.08],
-            color=DATA, linewidth=1.1, solid_capstyle="round", zorder=1)
-    ax.plot([2.80, 2.80, 2.925], [4.08, 2.35, 2.35],
-            color=DATA, linewidth=1.1, solid_capstyle="round", zorder=1)
-    ax.add_patch(Circle((2.80, 4.08), 0.035, facecolor=DATA, edgecolor="none", zorder=3))
+    # Connecteur d'assemblage : IModeles est fournie une fois et requise deux
+    # fois. Le tronc part de la bille elle-même — il bifurquait auparavant en
+    # amont, si bien que la bille paraissait sans suite — et chaque dérivation
+    # rejoint l'ouverture de sa coupe.
+    ax.plot([2.955, 2.955], [4.67, 2.35], color=DATA, linewidth=1.1,
+            solid_capstyle="round", zorder=1)
+    # La dérivation rejoint l'ouverture de la coupe, à l'aplomb de son centre :
+    # s'arrêter à son bord extérieur laissait un jeu visible.
+    ax.plot([2.955, 3.15], [4.08, 4.08], color=DATA, linewidth=1.1, zorder=1)
+    ax.plot([2.955, 3.15], [2.35, 2.35], color=DATA, linewidth=1.1, zorder=1)
+    ax.add_patch(Circle((2.955, 4.08), 0.035, facecolor=DATA, edgecolor="none", zorder=3))
 
     # ---- légende ----
     y = 0.28
