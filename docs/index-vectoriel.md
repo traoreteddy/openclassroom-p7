@@ -12,11 +12,16 @@ Choix d'implémentation et mesures de l'index construit par
 | Vecteurs | 2 030 chunks pour 616 événements |
 | Dimension | 1 024 (`mistral-embed`) |
 | Métrique | Distance L2 |
-| Taille sur disque | ~6 Mo |
+| Taille sur disque | 9,8 Mo (8,31 Mo de vecteurs + 1,50 Mo de docstore) |
 
 Fichiers persistés dans `data/index/` :
 
-- `index.faiss` — les vecteurs et la structure de recherche ;
+- `index.faiss` — **les vecteurs eux-mêmes**, plus la structure de recherche.
+  C'est l'artefact de la vectorisation : 2 030 × 1 024 × 4 octets (float32) =
+  8,31 Mo, soit exactement la taille du fichier à 45 octets d'en-tête près. Les
+  vecteurs se relisent avec `index.reconstruct_n()`, ce dont
+  `scripts/benchmark_search.py` se sert pour comparer les algorithmes sans
+  refacturer un seul embedding ;
 - `index.pkl` — le docstore LangChain : texte et métadonnées de chaque chunk ;
 - `index_meta.json` — fournisseur, modèle, dimension, type d'index et paramètres
   de chunking, écrits par le projet.
@@ -98,9 +103,73 @@ index partiel pour vérifier qu'il est bien rejeté.
 
 ## 6. Construction par lots
 
-Les embeddings sont calculés par lots de 64. L'appel lot par lot borne la taille
-des requêtes envoyées à l'API et permet de suivre l'avancement sur plusieurs
-milliers de chunks. Durée mesurée : ~32 s pour 1 210 chunks via l'API Mistral.
+Les embeddings sont calculés par lots de 64 (`BATCH_SIZE`), dans la boucle de
+`faiss_store.py` :
+
+```python
+for start in range(0, len(documents), BATCH_SIZE):
+    lot = documents[start : start + BATCH_SIZE]
+    store.add_documents(lot)
+    logger.info("  %s / %s chunks vectorisés",
+                min(start + BATCH_SIZE, len(documents)), len(documents))
+```
+
+### Déroulé sur le corpus de référence
+
+`range(0, 2030, 64)` produit 32 départs : 0, 64, 128, … 1984. À chaque tour, une
+tranche de 64 documents est prélevée. Les trois derniers tours :
+
+```
+documents[1856:1920] → 64 documents
+documents[1920:1984] → 64 documents
+documents[1984:2048] → 46 documents    ← 2030 n'est pas un multiple de 64
+```
+
+Le dernier lot est incomplet, et aucun cas particulier ne le traite : le
+découpage Python tronque de lui-même à la fin de la liste, `documents[1984:2048]`
+ne lève pas d'erreur alors que l'indice 2048 n'existe pas.
+
+Le `min()` de la ligne de journal relève du même détail : au dernier tour,
+`start + BATCH_SIZE` vaut 2048 pour 2 030 documents. Sans lui, le journal
+afficherait « 2048 / 2030 chunks vectorisés » — sans conséquence sur le
+traitement, mais de quoi faire douter du reste.
+
+### Ce que fait un tour de boucle
+
+`store.add_documents(lot)` enchaîne deux opérations dans LangChain :
+
+1. **Appel à l'API** — `embedding_function.embed_documents(textes)` envoie les 64
+   `page_content` à Mistral, qui renvoie 64 vecteurs de 1 024 nombres. Seul le
+   `page_content` est vectorisé ; les métadonnées ne partent jamais chez le
+   fournisseur.
+2. **Insertion** — `index.add(vector)` ajoute la matrice à l'index, soit 256 Ko
+   par lot (64 × 1024 × 4 octets), puis le texte et les métadonnées rejoignent
+   le docstore, reliés au vecteur par `index_to_docstore_id`.
+
+Bilan pour le corpus de référence : **32 appels d'embedding**, plus un premier
+appel isolé qui sert uniquement à connaître la dimension des vecteurs avant de
+créer l'index vide. Durée mesurée : ~32 s pour 1 210 chunks.
+
+### Pourquoi découper
+
+- **Contrainte de l'API** : 2 030 textes en une requête représenteraient
+  plusieurs mégaoctets de charge utile, au-delà des plafonds de taille et de
+  tokens par appel.
+- **Visibilité** : la vectorisation dure une trentaine de secondes ; sans
+  journal d'avancement, rien ne distinguerait un traitement en cours d'un
+  blocage réseau.
+
+### Comportement en cas d'échec
+
+L'écriture sur disque (`save_local`) intervient **après** la boucle. Si un lot
+échoue, l'exception remonte et `index.faiss` n'est jamais écrit partiellement :
+l'index précédent reste intact. Un index à moitié construit serait pire qu'une
+absence d'index, puisque rien ne le signalerait à la recherche.
+
+Le revers est qu'il n'y a pas de reprise : un échec au 30ᵉ lot sur 32 perd les
+29 appels déjà payés. À cette échelle — trente secondes et quelques centimes —
+c'est acceptable. Sur un corpus de plusieurs centaines de milliers de chunks, il
+faudrait sauvegarder l'index tous les N lots pour permettre une reprise.
 
 ## 7. Garde-fou au chargement
 
