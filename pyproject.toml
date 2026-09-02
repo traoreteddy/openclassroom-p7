@@ -8,7 +8,7 @@ dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
     "langchain>=0.3",
-    "langchain-community>=0.3",
+    "langchain-community>=0.3.31,<0.4",
     "langchain-mistralai>=0.2",
     "faiss-cpu>=1.9",
     "httpx>=0.27",
@@ -16,6 +16,7 @@ dependencies = [
     "python-dotenv>=1.0",
     "langchain-huggingface>=0.3",
     "sentence-transformers>=3.0",
+    "ragas>=0.4",
 ]
 
 [dependency-groups]
