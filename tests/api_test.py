@@ -194,3 +194,47 @@ def test_integration_serveur_reel():
     assert len(corps["answer"]) > 50
     assert corps["sources"]
     assert all(s["url"].startswith("https://openagenda.com/") for s in corps["sources"])
+
+
+# --- /metadata ------------------------------------------------------------------
+
+
+def test_metadata_decrit_le_catalogue():
+    """L'endpoint doit dire ce que le catalogue couvre, pas seulement sa taille."""
+    reponse = client.get("/metadata")
+    if reponse.status_code == 503:
+        pytest.skip("aucun corpus indexé dans cet environnement")
+    assert reponse.status_code == 200
+    corps = reponse.json()
+    assert corps["index"]["chunks"] > 0
+    assert corps["corpus"]["cities"], "le périmètre géographique doit être exposé"
+    assert corps["corpus"]["events"] >= corps["corpus"]["upcoming_events"]
+    assert corps["sources_total"] >= len(corps["sources"])
+
+
+def test_metadata_pagine_les_agendas_source():
+    """Le catalogue compte des dizaines d'agendas : tout renvoyer alourdirait."""
+    reponse = client.get("/metadata", params={"limit": 3})
+    if reponse.status_code == 503:
+        pytest.skip("aucun corpus indexé dans cet environnement")
+    corps = reponse.json()
+    assert len(corps["sources"]) <= 3
+    assert corps["limit"] == 3 and corps["offset"] == 0
+
+    suite = client.get("/metadata", params={"limit": 3, "offset": 3}).json()
+    assert suite["offset"] == 3
+    if corps["sources_total"] > 3:
+        assert suite["sources"][0] != corps["sources"][0], "la page suivante doit différer"
+
+
+def test_metadata_trie_les_agendas_du_plus_fourni():
+    reponse = client.get("/metadata", params={"limit": 5})
+    if reponse.status_code == 503:
+        pytest.skip("aucun corpus indexé dans cet environnement")
+    effectifs = [s["events"] for s in reponse.json()["sources"]]
+    assert effectifs == sorted(effectifs, reverse=True)
+
+
+@pytest.mark.parametrize("params", [{"limit": 0}, {"limit": 500}, {"offset": -1}])
+def test_metadata_rejette_une_pagination_invalide(params):
+    assert client.get("/metadata", params=params).status_code == 422

@@ -10,19 +10,26 @@ Documentation interactive : http://127.0.0.1:8000/docs
 
 from __future__ import annotations
 
+import collections
 import json
 import logging
 import secrets
 import time
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
+from functools import lru_cache
 
-from fastapi import Depends, FastAPI, Header, HTTPException, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, status
 
 from puls_events_rag.api.schemas import (
     AskRequest,
     AskResponse,
+    CorpusInfo,
     HealthResponse,
+    IndexInfo,
+    MetadataResponse,
     RebuildResponse,
+    SourceAgenda,
 )
 from puls_events_rag.config import INDEX_DIR, PROCESSED_DATA_DIR, settings
 from puls_events_rag.ingestion import open_agenda
@@ -96,6 +103,90 @@ def health() -> HealthResponse:
         index_ready=True,
         chunks_indexed=meta.get("chunks"),
         embedding_provider=meta.get("embedding_provider"),
+    )
+
+
+@lru_cache(maxsize=1)
+def _documents() -> list[dict]:
+    """Documents nettoyés, lus une fois.
+
+    Le fichier pèse plus d'un mégaoctet : le relire à chaque appel de /metadata
+    coûterait plus cher que la recherche vectorielle elle-même.
+    """
+    chemin = PROCESSED_DATA_DIR / "documents.json"
+    if not chemin.exists():
+        return []
+    return json.loads(chemin.read_text(encoding="utf-8"))
+
+
+@app.get("/metadata", response_model=MetadataResponse, tags=["Service"])
+def metadata(
+    limit: int = Query(default=20, ge=1, le=200,
+                       description="Nombre d'agendas source retournés"),
+    offset: int = Query(default=0, ge=0, description="Rang du premier agenda retourné"),
+) -> MetadataResponse:
+    """Décrit le catalogue interrogeable : périmètre, volumétrie, sources.
+
+    Destiné aux équipes produit et marketing : avant de se fier à une réponse,
+    il faut savoir quelles villes et quelle période le catalogue couvre, et d'où
+    viennent les événements.
+
+    La liste des agendas source est paginée par `limit` et `offset` : le
+    catalogue en compte plusieurs dizaines, et tout renvoyer alourdirait la
+    réponse sans servir l'appelant.
+
+    Codes d'erreur :
+    - **503** : aucun corpus indexé — lancer `/rebuild` au préalable
+    """
+    documents = _documents()
+    if not documents:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Aucun corpus indexé. Lancez /rebuild au préalable.",
+        )
+
+    meta_path = INDEX_DIR / "index_meta.json"
+    meta = json.loads(meta_path.read_text(encoding="utf-8")) if meta_path.exists() else {}
+    construit_le = (
+        datetime.fromtimestamp(meta_path.stat().st_mtime, UTC).isoformat()
+        if meta_path.exists() else None
+    )
+
+    metadonnees = [d["metadata"] for d in documents]
+    debuts = sorted(m["date_debut"] for m in metadonnees if m.get("date_debut"))
+    fins = sorted(m["date_fin"] for m in metadonnees if m.get("date_fin"))
+    maintenant = datetime.now(UTC).isoformat()
+
+    agendas = collections.Counter(m.get("agenda_source") or "(non précisé)"
+                                  for m in metadonnees)
+    classes = agendas.most_common()
+
+    return MetadataResponse(
+        index=IndexInfo(
+            chunks=meta.get("chunks", 0),
+            events=meta.get("documents", len(documents)),
+            dimension=meta.get("dimension"),
+            index_type=meta.get("index_type"),
+            embedding_provider=meta.get("embedding_provider"),
+            embedding_model=meta.get("embedding_model"),
+            chunk_size=meta.get("chunk_size"),
+            chunk_overlap=meta.get("chunk_overlap"),
+            built_at=construit_le,
+        ),
+        corpus=CorpusInfo(
+            cities=sorted({m["ville"] for m in metadonnees if m.get("ville")}),
+            period_start=debuts[0] if debuts else None,
+            period_end=fins[-1] if fins else None,
+            events=len(documents),
+            upcoming_events=sum(1 for f in fins if f >= maintenant),
+            with_url=sum(1 for m in metadonnees if m.get("url")),
+            with_coordinates=sum(1 for m in metadonnees if m.get("latitude") is not None),
+        ),
+        sources=[SourceAgenda(agenda=nom, events=n)
+                 for nom, n in classes[offset : offset + limit]],
+        sources_total=len(classes),
+        limit=limit,
+        offset=offset,
     )
 
 
@@ -193,6 +284,7 @@ def rebuild() -> RebuildResponse:
         ) from exc
 
     reset_cache()
+    _documents.cache_clear()
     return RebuildResponse(
         status="ok",
         events_collected=len(evenements),
