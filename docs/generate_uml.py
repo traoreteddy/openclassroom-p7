@@ -22,7 +22,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import matplotlib
-from matplotlib.patches import Arc, Circle, FancyBboxPatch, Rectangle
+from matplotlib.patches import Arc, Circle, FancyBboxPatch, Polygon, Rectangle
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -85,13 +85,17 @@ def interface_fournie(ax, x, y, nom, cote="droite", couleur=DATA):
             bbox={"facecolor": PAPIER, "edgecolor": "none", "pad": 1.0})
 
 
-def interface_requise(ax, x, y, cote="gauche", couleur=DATA):
+def interface_requise(ax, x, y, cote="gauche", couleur=DATA, nom=""):
     """Interface requise : le « socket » — un trait et un demi-cercle ouvert."""
     dx = -0.30 if cote == "gauche" else 0.30
     ax.plot([x, x + dx], [y, y], color=couleur, linewidth=1.2, zorder=3)
     angle = 90 if cote == "gauche" else 270
     ax.add_patch(Arc((x + dx * 1.25, y), 0.2, 0.2, angle=angle,
                      theta1=-90, theta2=90, color=couleur, linewidth=1.4, zorder=4))
+    if nom:
+        ax.text(x + dx * 1.25, y + 0.21, nom, fontsize=6.6, color=couleur, family=SANS,
+                ha="center", va="center", zorder=5,
+                bbox={"facecolor": PAPIER, "edgecolor": "none", "pad": 1.0})
 
 
 def dependance(ax, xy1, xy2, etiquette="", couleur=GRIS, courbure=0.0,
@@ -111,6 +115,29 @@ def dependance(ax, xy1, xy2, etiquette="", couleur=GRIS, courbure=0.0,
                 etiquette, fontsize=6.3, color=couleur, family=SANS,
                 ha="left" if vertical else "center", va="center", style="italic",
                 bbox={"facecolor": PAPIER, "edgecolor": "none", "pad": 1.2}, zorder=6)
+
+
+def note(ax, x, y, w, h, texte, ancre=None):
+    """Note UML : rectangle au coin supérieur droit replié, reliée à son élément.
+
+    Un simple texte en italique sous un composant n'appartient pas à la notation :
+    la note est un élément UML à part entière, et le trait dit à quoi elle se
+    rapporte.
+    """
+    pli = 0.16
+    contour = [(x, y), (x + w, y), (x + w, y + h - pli), (x + w - pli, y + h),
+               (x, y + h), (x, y)]
+    ax.add_patch(Polygon(contour, closed=True, facecolor="#FFFBF5",
+                         edgecolor=GRIS, linewidth=0.9, zorder=2))
+    ax.plot([x + w - pli, x + w - pli, x + w],
+            [y + h, y + h - pli, y + h - pli],
+            color=GRIS, linewidth=0.9, zorder=3)
+    for i, ligne in enumerate(texte.split("\n")):
+        ax.text(x + 0.11, y + h - 0.20 - i * 0.17, ligne, fontsize=6.5, color=ENCRE_DOUCE,
+                family=SANS, va="center", zorder=4)
+    if ancre:
+        ax.plot([x + w, ancre[0]], [y + h / 2, ancre[1]], color=GRIS, linewidth=0.8,
+                linestyle=(0, (2, 2)), zorder=1)
 
 
 def paquet(ax, x, y, w, h, nom, couleur=REGLE):
@@ -151,10 +178,11 @@ def diagramme_composants() -> plt.Figure:
               couleur=DATA_PALE, bordure=DATA, stereotype="external system")
 
     # ---- configuration, transverse ----
-    composant(ax, 0.32, 2.55, 2.26, 0.85, "config",
+    composant(ax, 0.32, 2.62, 2.26, 0.85, "config",
               "paramètres centralisés\nlus depuis .env")
-    ax.text(1.45, 2.34, "utilisé par tous les composants", fontsize=6.4, color=GRIS,
-            family=SANS, ha="center", style="italic")
+    note(ax, 0.32, 1.62, 2.26, 0.78,
+         "Lue par tous les composants :\nvilles, période, modèles,\nseuils, jetons d'API.",
+         ancre=(2.58, 2.90))
 
     # ---- pipeline hors ligne ----
     paquet(ax, 3.20, 3.55, 3.55, 2.80, "Pipeline d'indexation  «hors ligne»")
@@ -169,14 +197,14 @@ def diagramme_composants() -> plt.Figure:
     composant(ax, 7.35, 4.95, 3.15, 0.85, "vectorstore.faiss_store",
               "construction, persistance,\nvérification",
               couleur=ACCENT_PALE, bordure=ACCENT)
-    ax.add_patch(FancyBboxPatch((7.55, 3.72), 2.75, 0.78,
+    ax.add_patch(FancyBboxPatch((7.35, 3.62), 3.15, 0.85,
                                 boxstyle="round,pad=0,rounding_size=0.06",
                                 facecolor=SURFACE, edgecolor=REGLE, linewidth=1.1))
-    ax.text(7.71, 4.34, "«artifact»", fontsize=6.4, color=GRIS, style="italic", family=SANS)
-    ax.text(7.71, 4.12, "data/index/", fontsize=8.6, color=ENCRE, family=SANS, weight="bold")
-    ax.text(7.71, 3.92, "index.faiss · index.pkl", fontsize=6.9,
+    ax.text(7.51, 4.31, "«artifact»", fontsize=6.4, color=GRIS, style="italic", family=SANS)
+    ax.text(7.51, 4.09, "data/index/", fontsize=8.6, color=ENCRE, family=SANS, weight="bold")
+    ax.text(7.51, 3.89, "index.faiss · index.pkl", fontsize=6.9,
             color=ENCRE_DOUCE, family=SANS)
-    ax.text(7.71, 3.83, "index_meta.json", fontsize=6.9, color=ENCRE_DOUCE, family=SANS)
+    ax.text(7.51, 3.72, "index_meta.json", fontsize=6.9, color=ENCRE_DOUCE, family=SANS)
 
     # ---- chaîne temps réel ----
     paquet(ax, 3.20, 0.72, 7.30, 2.35, "Chaîne d'inférence  «temps réel»")
@@ -196,6 +224,7 @@ def diagramme_composants() -> plt.Figure:
     interface_requise(ax, 3.40, 5.84, "gauche", DATA)
     interface_fournie(ax, 2.58, 4.67, "IModeles", "droite", DATA)
     interface_requise(ax, 3.40, 4.10, "gauche", DATA)
+    interface_requise(ax, 3.40, 2.16, "gauche", DATA, "IModeles")
     interface_fournie(ax, 10.50, 5.37, "IRecherche", "droite", ACCENT)
     interface_fournie(ax, 10.30, 2.34, "IReponse", "droite", ACCENT)
 
@@ -209,10 +238,10 @@ def diagramme_composants() -> plt.Figure:
     dependance(ax, (4.98, 1.92), (4.98, 1.66), "«use»")
     dependance(ax, (8.72, 1.92), (8.72, 1.66), "«use»")
     dependance(ax, (7.15, 2.34), (6.55, 2.34), "appelle")
-    dependance(ax, (3.40, 2.20), (2.58, 2.90), "«use»", courbure=0.10,
-               etiquette_xy=(2.92, 2.44))
-    dependance(ax, (3.40, 2.55), (2.58, 4.32), "génère", courbure=-0.18,
-               etiquette_xy=(2.72, 3.55))
+    # Connecteur d'assemblage : rag.chain requiert IModeles, fournie par Mistral.
+    # Tracé orthogonal dans la colonne libre, pour ne croiser aucun composant.
+    ax.plot([2.955, 2.85, 2.85, 3.025], [4.67, 4.67, 2.16, 2.16],
+            color=DATA, linewidth=1.1, solid_capstyle="round", zorder=1)
 
     # ---- légende ----
     y = 0.28
